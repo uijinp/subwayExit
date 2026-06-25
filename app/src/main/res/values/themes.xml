@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose 앱: 액티비티는 프레임워크 NoActionBar 테마만 사용. 실제 색/타이포는 Compose Theme 에서. -->
+    <style name="Theme.SubwayAlarm" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/primary</item>
+    </style>
+</resources>

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 단순 지하철/알람 모티프 (플레이스홀더) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30a16,16 0,0 0,-16 16v18a8,8 0,0 0,8 8h16a8,8 0,0 0,8 -8V46a16,16 0,0 0,-16 -16zM46,72m-4,0a4,4 0,1 0,8 0a4,4 0,1 0,-8 0zM62,72m-4,0a4,4 0,1 0,8 0a4,4 0,1 0,-8 0z" />
+</vector>
