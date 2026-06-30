@@ -59,6 +59,25 @@ class StationGraphTest {
     }
 
     @Test
+    fun `stationBeforeArrival 은 leadStations 만큼 추가로 거슬러 올라감`() {
+        val g = line()
+        // ASCENDING 으로 E 도착 기준 2역 전 = C
+        assertEquals("C", g.stationBeforeArrival("E", Direction.ASCENDING, leadStations = 2)?.statnId)
+    }
+
+    @Test
+    fun `leadStations 가 그래프 경계를 넘으면 null`() {
+        val g = line()
+        // ASCENDING 으로 B 도착 기준 3역 전은 그래프 밖(A 이전) → null
+        assertNull(g.stationBeforeArrival("B", Direction.ASCENDING, leadStations = 3))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `leadStations 0 이하는 예외`() {
+        line().stationBeforeArrival("E", Direction.ASCENDING, leadStations = 0)
+    }
+
+    @Test
     fun `진행 방향상 시발역의 직전역은 null`() {
         val g = line()
         // ASCENDING 인데 목적지가 최저 순번 A → 직전역 없음

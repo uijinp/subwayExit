@@ -53,11 +53,17 @@ class StationGraph(stations: List<Station>) {
         nextStation(currentId, direction.opposite)
 
     /**
-     * 목적지 도착 직전에 지나는 역(= 한 역 전).
-     * dest 가 진행 방향상 시발역이면 null.
+     * 목적지로부터 [leadStations]개 전에 지나는 역(기본 1 = "한 역 전").
+     * 도중에 그래프 경계를 벗어나면(시발역 인근) null.
      */
-    fun stationBeforeArrival(destId: String, direction: Direction): Station? =
-        previousStation(destId, direction)
+    fun stationBeforeArrival(destId: String, direction: Direction, leadStations: Int = 1): Station? {
+        require(leadStations >= 1) { "leadStations 는 1 이상이어야 합니다: $leadStations" }
+        var current = require(destId)
+        repeat(leadStations) {
+            current = previousStation(current.statnId, direction) ?: return null
+        }
+        return current
+    }
 
     /**
      * current 에서 dest 까지 남은 정차역 수(현재역 제외, 목적지 포함 거리).
