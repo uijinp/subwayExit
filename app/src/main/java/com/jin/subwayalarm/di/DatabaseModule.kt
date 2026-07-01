@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.jin.subwayalarm.data.local.SubwayDatabase
 import com.jin.subwayalarm.data.local.dao.LineMetaDao
 import com.jin.subwayalarm.data.local.dao.StationDao
+import com.jin.subwayalarm.data.local.dao.TripSessionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,4 +30,7 @@ object DatabaseModule {
 
     @Provides
     fun provideLineMetaDao(db: SubwayDatabase): LineMetaDao = db.lineMetaDao()
+
+    @Provides
+    fun provideTripSessionDao(db: SubwayDatabase): TripSessionDao = db.tripSessionDao()
 }

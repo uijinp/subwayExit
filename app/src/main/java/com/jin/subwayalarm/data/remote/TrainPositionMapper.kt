@@ -15,6 +15,7 @@ fun TrainPositionDto.toDomainOrNull(): TrainPosition? {
     val trainNoValue = trainNo ?: return null
     val statnIdValue = statnId ?: return null
     val statnNameValue = statnNm ?: return null
+    val updnLineValue = updnLine ?: return null
     val recptnDtValue = recptnDt ?: return null
     val statusCode = trainSttus?.trim()?.toIntOrNull() ?: return null
     val status = TrainStatus.fromCode(statusCode) ?: return null
@@ -26,6 +27,7 @@ fun TrainPositionDto.toDomainOrNull(): TrainPosition? {
         trainNo = trainNoValue,
         statnId = statnIdValue,
         statnName = statnNameValue,
+        updnLine = updnLineValue,
         status = status,
         isExpress = directAt == "1",
         isLastTrain = lstcarAt == "1",

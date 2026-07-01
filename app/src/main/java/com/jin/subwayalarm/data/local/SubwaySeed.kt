@@ -22,6 +22,8 @@ object SubwaySeed {
         lineName = "7호선",
         supportsRealtime = true,
         topology = LineTopology.LINEAR,
+        // directionPolarity 는 실측 전(작업 3)이라 기본값 null 유지.
+        // null 인 동안 MatchBoardedTrainUseCase 자동 매칭은 수행되지 않는다.
     )
 
     private val line7Names = listOf(

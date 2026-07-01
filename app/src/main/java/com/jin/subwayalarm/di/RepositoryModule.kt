@@ -2,6 +2,10 @@ package com.jin.subwayalarm.di
 
 import com.jin.subwayalarm.data.repository.StationRepository
 import com.jin.subwayalarm.data.repository.StationRepositoryImpl
+import com.jin.subwayalarm.data.repository.TrainPositionRepository
+import com.jin.subwayalarm.data.repository.TrainPositionRepositoryImpl
+import com.jin.subwayalarm.data.repository.TripSessionRepository
+import com.jin.subwayalarm.data.repository.TripSessionRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -15,4 +19,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindStationRepository(impl: StationRepositoryImpl): StationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTrainPositionRepository(impl: TrainPositionRepositoryImpl): TrainPositionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTripSessionRepository(impl: TripSessionRepositoryImpl): TripSessionRepository
 }

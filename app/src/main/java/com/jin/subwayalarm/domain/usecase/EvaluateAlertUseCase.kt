@@ -2,6 +2,7 @@ package com.jin.subwayalarm.domain.usecase
 
 import com.jin.subwayalarm.domain.model.StationGraph
 import com.jin.subwayalarm.domain.model.TrainStatus
+import javax.inject.Inject
 
 /**
  * 직전역 판정 결과 (설계 3-1).
@@ -32,7 +33,7 @@ sealed class AlertEvaluation {
  * 순수함수: 외부 상태(시간·네트워크)에 의존하지 않아 단말 없이 반복 검증 가능(R-4 Replay 대비).
  * 중복 발화 방지(alerted 플래그)는 호출측(TripSession)이 [alreadyAlerted] 로 전달.
  */
-class EvaluateAlertUseCase {
+class EvaluateAlertUseCase @Inject constructor() {
 
     operator fun invoke(
         graph: StationGraph,

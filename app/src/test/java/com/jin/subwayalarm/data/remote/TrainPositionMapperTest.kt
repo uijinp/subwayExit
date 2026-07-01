@@ -30,6 +30,7 @@ class TrainPositionMapperTest {
         assertEquals("7101", result.trainNo)
         assertEquals("1007-07", result.statnId)
         assertEquals("건대입구", result.statnName)
+        assertEquals("0", result.updnLine)
         assertEquals(TrainStatus.ARRIVED, result.status)
         assertTrue(!result.isExpress)
         assertTrue(!result.isLastTrain)
@@ -49,6 +50,7 @@ class TrainPositionMapperTest {
         assertNull(validDto().copy(statnId = null).toDomainOrNull())
         assertNull(validDto().copy(statnNm = null).toDomainOrNull())
         assertNull(validDto().copy(subwayId = null).toDomainOrNull())
+        assertNull(validDto().copy(updnLine = null).toDomainOrNull())
         assertNull(validDto().copy(recptnDt = null).toDomainOrNull())
     }
 

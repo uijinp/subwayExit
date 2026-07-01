@@ -7,10 +7,12 @@ package com.jin.subwayalarm.domain.model
  * @param lineName         노선명 (URL·표시용, 예: "7호선")
  * @param supportsRealtime 실시간 위치 API 지원 여부 (서울 외 구간 false)
  * @param topology         노선 위상
+ * @param directionPolarity updnLine↔Direction 매핑. null = 작업순서 3에서 실측 검증 전(미확정).
  */
 data class LineMeta(
     val lineId: String,
     val lineName: String,
     val supportsRealtime: Boolean,
     val topology: LineTopology,
+    val directionPolarity: DirectionPolarity? = null,
 )

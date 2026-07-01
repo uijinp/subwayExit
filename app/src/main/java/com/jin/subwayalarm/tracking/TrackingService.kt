@@ -1,25 +1,182 @@
 package com.jin.subwayalarm.tracking
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
+import com.jin.subwayalarm.R
+import com.jin.subwayalarm.alarm.AlarmController
+import com.jin.subwayalarm.data.repository.PositionFetchResult
+import com.jin.subwayalarm.data.repository.StationRepository
+import com.jin.subwayalarm.data.repository.TrainPositionRepository
+import com.jin.subwayalarm.data.repository.TripSessionRepository
+import com.jin.subwayalarm.domain.model.AlarmSetting
+import com.jin.subwayalarm.domain.model.TrackingMode
+import com.jin.subwayalarm.domain.model.TripSession
+import com.jin.subwayalarm.domain.model.TripState
+import com.jin.subwayalarm.domain.usecase.TrackingStepInput
+import com.jin.subwayalarm.domain.usecase.TrackingStepUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
- * 추적 Foreground Service (FGS type = dataSync).
- *
- * 작업순서 7단계에서 본격 구현 예정:
- *  - startForeground() + 상시 알림(현재 추정역·정지 버튼)
- *  - 적응형 폴링 추적 루프(RealtimeTracker)
- *  - 프로세스 사망 복구(TripSession 영속화, START_REDELIVER_INTENT)
- *
- * 현재는 매니페스트 선언과 골격 컴파일을 위한 스텁.
+ * 추적 Foreground Service (FGS type = dataSync, 4-1). API 단독 추적(작업순서 7, "MVP 핵심").
+ * 2차(가속도계·HybridCoordinator)는 작업순서 11에서 합류.
  */
 @AndroidEntryPoint
 class TrackingService : LifecycleService() {
 
+    @Inject lateinit var stationRepository: StationRepository
+    @Inject lateinit var tripSessionRepository: TripSessionRepository
+    @Inject lateinit var trainPositionRepository: TrainPositionRepository
+    @Inject lateinit var trackingStep: TrackingStepUseCase
+    @Inject lateinit var alarmController: AlarmController
+
+    private var trackingJob: Job? = null
+    private var consecutiveFailures = 0
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        // TODO(step7): startForeground + 추적 루프 시작. 사망 복구 위해 REDELIVER.
+
+        if (intent?.action == ACTION_STOP) {
+            trackingJob?.cancel()
+            lifecycleScope.launch { tripSessionRepository.clear() }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        startForeground(TRACKING_NOTIFICATION_ID, buildNotification("추적 준비 중"))
+
+        val lineId = intent?.getStringExtra(EXTRA_LINE_ID)
+        val originId = intent?.getStringExtra(EXTRA_ORIGIN_STATN_ID)
+        val destId = intent?.getStringExtra(EXTRA_DEST_STATN_ID)
+
+        trackingJob?.cancel()
+        trackingJob = lifecycleScope.launch {
+            if (lineId != null && originId != null && destId != null) {
+                tripSessionRepository.save(
+                    TripSession(
+                        originStatnId = originId,
+                        destStatnId = destId,
+                        lineId = lineId,
+                        currentStatnId = originId,
+                        lastSyncAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }
+            runTrackingLoop()
+        }
+
+        // 프로세스가 죽어도 마지막 Intent 로 재전달 — TripSession(영속화됨)으로 이어받아 재개(4-1).
         return START_REDELIVER_INTENT
+    }
+
+    private suspend fun runTrackingLoop() {
+        while (lifecycleScope.isActive) {
+            val session = tripSessionRepository.current()
+            if (session == null || session.state == TripState.DONE) break
+
+            val graph = stationRepository.stationGraph(session.lineId)
+            val lineMeta = stationRepository.lineMetas().firstOrNull { it.lineId == session.lineId }
+            if (graph == null || lineMeta == null) break
+
+            when (val fetch = trainPositionRepository.fetchRealtimePosition(lineMeta.lineName)) {
+                is PositionFetchResult.Success -> {
+                    consecutiveFailures = 0
+                    val result = trackingStep(
+                        TrackingStepInput(
+                            graph = graph,
+                            session = session,
+                            positions = fetch.positions,
+                            nowEpochMillis = System.currentTimeMillis(),
+                            polarity = lineMeta.directionPolarity,
+                        ),
+                    )
+                    tripSessionRepository.save(result.updatedSession)
+
+                    val remaining = graph.remainingStops(result.updatedSession.currentStatnId, session.destStatnId)
+                    updateNotification(buildNotification(statusText(result.updatedSession, remaining)))
+
+                    val alert = result.alert
+                    if (alert != null) {
+                        val stationName = graph.station(alert.alertStationId)?.name.orEmpty()
+                        alarmController.trigger(stationName, AlarmSetting())
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                        return
+                    }
+                    delay(PollingIntervalPolicy.intervalSeconds(remaining) * 1000L)
+                }
+                is PositionFetchResult.RateLimited, is PositionFetchResult.Error -> {
+                    consecutiveFailures++
+                    updateNotification(buildNotification("갱신 지연 중…"))
+                    delay(PollingIntervalPolicy.backoffSeconds(consecutiveFailures) * 1000L)
+                }
+            }
+        }
+    }
+
+    private fun statusText(session: TripSession, remaining: Int): String =
+        "남은 역 ${remaining}개 · ${if (session.mode == TrackingMode.API) "실시간" else "추정"}"
+
+    private fun buildNotification(text: String): Notification {
+        ensureChannel()
+        val stopIntent = Intent(this, TrackingService::class.java).apply { action = ACTION_STOP }
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(this, TRACKING_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_alarm)
+            .setContentTitle("하차알람 추적 중")
+            .setContentText(text)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(0, "정지", stopPendingIntent)
+            .build()
+    }
+
+    private fun updateNotification(notification: Notification) {
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        manager.notify(TRACKING_NOTIFICATION_ID, notification)
+    }
+
+    private fun ensureChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        val channel = NotificationChannel(TRACKING_CHANNEL_ID, "추적 중", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "하차 알람 추적 상태 표시"
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    companion object {
+        const val EXTRA_LINE_ID = "com.jin.subwayalarm.extra.LINE_ID"
+        const val EXTRA_ORIGIN_STATN_ID = "com.jin.subwayalarm.extra.ORIGIN_STATN_ID"
+        const val EXTRA_DEST_STATN_ID = "com.jin.subwayalarm.extra.DEST_STATN_ID"
+        private const val ACTION_STOP = "com.jin.subwayalarm.action.STOP_TRACKING"
+        private const val TRACKING_CHANNEL_ID = "tracking"
+        private const val TRACKING_NOTIFICATION_ID = 2001
+
+        fun startIntent(context: Context, lineId: String, originStatnId: String, destStatnId: String): Intent =
+            Intent(context, TrackingService::class.java).apply {
+                putExtra(EXTRA_LINE_ID, lineId)
+                putExtra(EXTRA_ORIGIN_STATN_ID, originStatnId)
+                putExtra(EXTRA_DEST_STATN_ID, destStatnId)
+            }
+
+        fun stopIntent(context: Context): Intent =
+            Intent(context, TrackingService::class.java).apply { action = ACTION_STOP }
     }
 }
