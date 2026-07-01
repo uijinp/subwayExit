@@ -2,6 +2,7 @@ package com.jin.subwayalarm.ui.screen.tracking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jin.subwayalarm.alarm.AlarmController
 import com.jin.subwayalarm.data.repository.StationRepository
 import com.jin.subwayalarm.data.repository.TripSessionRepository
 import com.jin.subwayalarm.domain.model.TrackingMode
@@ -12,12 +13,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TrackingViewModel @Inject constructor(
-    tripSessionRepository: TripSessionRepository,
+    private val tripSessionRepository: TripSessionRepository,
     private val stationRepository: StationRepository,
+    private val alarmController: AlarmController,
 ) : ViewModel() {
 
     /** 여정 경로의 한 역. isCurrent = 현재 열차 위치. */
@@ -32,6 +35,8 @@ class TrackingViewModel @Inject constructor(
     )
 
     data class UiState(
+        val lineName: String = "",
+        val originName: String = "",
         val destinationName: String = "",
         val currentStationName: String = "",
         val remainingStops: Int = 0,
@@ -45,6 +50,12 @@ class TrackingViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = tripSessionRepository.observeCurrent()
         .map { buildUiState(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+
+    /** 알람 배너 "확인했어요" — 진동·알림 해제 + 여정 종료(홈 복귀). */
+    fun acknowledgeAlarm() {
+        alarmController.dismiss()
+        viewModelScope.launch { tripSessionRepository.clear() }
+    }
 
     private suspend fun buildUiState(session: TripSession?): UiState {
         if (session == null || session.state == TripState.DONE) return UiState(isActive = false)
@@ -65,7 +76,11 @@ class TrackingViewModel @Inject constructor(
             )
         }
 
+        val lineName = stationRepository.lineMetas().firstOrNull { it.lineId == session.lineId }?.lineName.orEmpty()
+
         return UiState(
+            lineName = lineName,
+            originName = graph.station(session.originStatnId)?.name.orEmpty(),
             destinationName = graph.station(session.destStatnId)?.name.orEmpty(),
             currentStationName = graph.station(session.currentStatnId)?.name.orEmpty(),
             remainingStops = graph.remainingStops(session.currentStatnId, session.destStatnId),

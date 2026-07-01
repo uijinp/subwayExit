@@ -5,7 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -33,11 +37,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jin.subwayalarm.tracking.TrackingService
+import com.jin.subwayalarm.ui.theme.DawatColors
 import kotlinx.coroutines.launch
 
 @Composable
@@ -55,82 +64,98 @@ fun HomeScreen(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) viewModel.detectOrigin() }
 
-    Scaffold { padding ->
+    Scaffold(containerColor = DawatColors.LightBg) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("하차알람", style = MaterialTheme.typography.headlineMedium)
-
-            SearchableDropdown(
-                label = "노선",
-                options = uiState.lines.map { it.lineId to it.lineName },
-                selectedId = uiState.selectedLineId,
-                onSelect = viewModel::selectLine,
-            )
-
+            // 로고 헤더
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SearchableDropdown(
-                    label = "출발역",
-                    options = uiState.stations.map { it.statnId to it.name },
-                    selectedId = uiState.originStatnId,
-                    onSelect = viewModel::selectOrigin,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(
-                    enabled = !uiState.detecting,
-                    onClick = {
-                        val granted = ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.ACCESS_COARSE_LOCATION,
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (granted) viewModel.detectOrigin() else {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                        }
-                    },
-                ) {
-                    Text(if (uiState.detecting) "…" else "📍")
-                }
-            }
-            uiState.detectMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Box(
+                    modifier = Modifier.width(40.dp).height(40.dp)
+                        .clip(RoundedCornerShape(12.dp)).background(DawatColors.HeroCard),
+                    contentAlignment = Alignment.Center,
+                ) { Text("다", color = DawatColors.OnDark, fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("다왔다", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            SearchableDropdown(
-                label = "목적지",
-                options = uiState.stations.map { it.statnId to it.name },
-                selectedId = uiState.destStatnId,
-                onSelect = viewModel::selectDestination,
-            )
+            // 경로 입력 카드
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp)).background(DawatColors.Card)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SearchableDropdown(
+                    label = "노선",
+                    options = uiState.lines.map { it.lineId to it.lineName },
+                    selectedId = uiState.selectedLineId,
+                    onSelect = viewModel::selectLine,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SearchableDropdown(
+                        label = "출발역",
+                        options = uiState.stations.map { it.statnId to it.name },
+                        selectedId = uiState.originStatnId,
+                        onSelect = viewModel::selectOrigin,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedButton(
+                        enabled = !uiState.detecting,
+                        shape = RoundedCornerShape(12.dp),
+                        onClick = {
+                            val granted = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (granted) viewModel.detectOrigin() else {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                            }
+                        },
+                    ) { Text(if (uiState.detecting) "…" else "📍") }
+                }
+                uiState.detectMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = DawatColors.Green, fontWeight = FontWeight.Bold)
+                }
+                SearchableDropdown(
+                    label = "목적지",
+                    options = uiState.stations.map { it.statnId to it.name },
+                    selectedId = uiState.destStatnId,
+                    onSelect = viewModel::selectDestination,
+                )
+            }
 
             uiState.remainingStops?.let { remaining ->
-                Text(
-                    "목적지까지 $remaining 정거장",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("목적지까지 ", style = MaterialTheme.typography.titleMedium)
+                    Text("$remaining 정거장", style = MaterialTheme.typography.titleMedium, color = DawatColors.GreenDeep, fontWeight = FontWeight.Bold)
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 enabled = uiState.canStart,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DawatColors.Green,
+                    contentColor = DawatColors.OnGreen,
+                    disabledContainerColor = DawatColors.Divider,
+                ),
                 onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                     scope.launch {
                         viewModel.startTrip()
-                        ContextCompat.startForegroundService(
-                            context,
-                            com.jin.subwayalarm.tracking.TrackingService.startIntent(context),
-                        )
+                        ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
                         onTripStarted()
                     }
                 },
             ) {
-                Text("추적 시작")
+                Text("▶ 추적 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }
@@ -150,7 +175,6 @@ private fun SearchableDropdown(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    // selectedId 가 외부에서 바뀌면(자동감지·노선변경) 입력 텍스트를 해당 역명으로 재동기화.
     var query by remember(selectedId, options) {
         mutableStateOf(options.firstOrNull { it.first == selectedId }?.second.orEmpty())
     }
