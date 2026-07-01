@@ -44,4 +44,28 @@ class SubwaySeedLinesTest {
         assertEquals("남태령", g.stations.last().name)
         assertEquals("1004000409", g.stations.first().statnId)
     }
+
+    @Test
+    fun `6호선은 응암-신내 39역, statnId 는 base 610`() {
+        val g = StationGraph(SubwaySeed.line6.stations)
+        assertEquals(39, g.size)
+        assertEquals("응암", g.stations.first().name)
+        assertEquals("신내", g.stations.last().name)
+        assertEquals("1006000610", g.stations.first().statnId)
+    }
+
+    @Test
+    fun `9호선은 개화-중앙보훈병원 38역(연장 병합), statnId 는 base 901`() {
+        val g = StationGraph(SubwaySeed.line9.stations)
+        assertEquals(38, g.size)
+        assertEquals("개화", g.stations.first().name)
+        assertEquals("중앙보훈병원", g.stations.last().name)
+        assertEquals("1009000901", g.stations.first().statnId)
+    }
+
+    @Test
+    fun `현재 5개 노선(3·4·6·7·9호선) 수록`() {
+        val ids = SubwaySeed.allLines.map { it.meta.lineId }.toSet()
+        assertEquals(setOf("1003", "1004", "1006", "1007", "1009"), ids)
+    }
 }
