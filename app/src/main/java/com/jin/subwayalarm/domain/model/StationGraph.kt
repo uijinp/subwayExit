@@ -78,4 +78,16 @@ class StationGraph(stations: List<Station>) {
     /** 출발/목적이 모두 존재하고 서로 다른지. */
     fun isValidTrip(originId: String, destId: String): Boolean =
         contains(originId) && contains(destId) && byId[originId]!!.order != byId[destId]!!.order
+
+    /**
+     * origin → dest 까지 진행 방향 순서대로의 역 목록(양끝 포함). 여정 시각화용.
+     * 유효하지 않은 여정이면 빈 리스트.
+     */
+    fun stationsBetween(originId: String, destId: String): List<Station> {
+        if (!isValidTrip(originId, destId)) return emptyList()
+        val o = byId.getValue(originId)
+        val d = byId.getValue(destId)
+        val range = if (d.order >= o.order) o.order..d.order else o.order downTo d.order
+        return range.mapNotNull { byOrder[it] }
+    }
 }

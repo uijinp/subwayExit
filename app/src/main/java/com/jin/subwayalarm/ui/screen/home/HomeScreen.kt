@@ -19,8 +19,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,8 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.jin.subwayalarm.domain.model.Station
-import com.jin.subwayalarm.tracking.TrackingService
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,20 +61,22 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("하차알람", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                uiState.lineName.ifEmpty { "노선 로딩 중…" },
-                style = MaterialTheme.typography.titleMedium,
+
+            SearchableDropdown(
+                label = "노선",
+                options = uiState.lines.map { it.lineId to it.lineName },
+                selectedId = uiState.selectedLineId,
+                onSelect = viewModel::selectLine,
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    StationDropdown(
-                        label = "출발역",
-                        stations = uiState.stations,
-                        selectedId = uiState.originStatnId,
-                        onSelect = viewModel::selectOrigin,
-                    )
-                }
+                SearchableDropdown(
+                    label = "출발역",
+                    options = uiState.stations.map { it.statnId to it.name },
+                    selectedId = uiState.originStatnId,
+                    onSelect = viewModel::selectOrigin,
+                    modifier = Modifier.weight(1f),
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(
                     enabled = !uiState.detecting,
@@ -96,24 +96,36 @@ fun HomeScreen(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
 
-            StationDropdown(
+            SearchableDropdown(
                 label = "목적지",
-                stations = uiState.stations,
+                options = uiState.stations.map { it.statnId to it.name },
                 selectedId = uiState.destStatnId,
                 onSelect = viewModel::selectDestination,
             )
+
+            uiState.remainingStops?.let { remaining ->
+                Text(
+                    "목적지까지 $remaining 정거장",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 enabled = uiState.canStart,
+                modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                     scope.launch {
                         viewModel.startTrip()
-                        ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
+                        ContextCompat.startForegroundService(
+                            context,
+                            com.jin.subwayalarm.tracking.TrackingService.startIntent(context),
+                        )
                         onTripStarted()
                     }
                 },
@@ -124,32 +136,56 @@ fun HomeScreen(
     }
 }
 
+/**
+ * 검색 가능한 선택 필드. 입력 텍스트로 [options] 를 실시간 필터링해 드롭다운으로 보여준다.
+ * options 는 (id, 표시명) 목록.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StationDropdown(
+private fun SearchableDropdown(
     label: String,
-    stations: List<Station>,
+    options: List<Pair<String, String>>,
     selectedId: String?,
     onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = stations.firstOrNull { it.statnId == selectedId }?.name.orEmpty()
+    // selectedId 가 외부에서 바뀌면(자동감지·노선변경) 입력 텍스트를 해당 역명으로 재동기화.
+    var query by remember(selectedId, options) {
+        mutableStateOf(options.firstOrNull { it.first == selectedId }?.second.orEmpty())
+    }
+    val filtered = if (query.isBlank()) {
+        options
+    } else {
+        options.filter { it.second.contains(query.trim(), ignoreCase = true) }
+    }
 
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
         OutlinedTextField(
-            value = selectedName,
-            onValueChange = {},
-            readOnly = true,
+            value = query,
+            onValueChange = {
+                query = it
+                expanded = true
+            },
             label = { Text(label) },
+            singleLine = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            stations.forEach { station ->
+        ExposedDropdownMenu(
+            expanded = expanded && filtered.isNotEmpty(),
+            onDismissRequest = { expanded = false },
+        ) {
+            filtered.take(60).forEach { (id, name) ->
                 DropdownMenuItem(
-                    text = { Text(station.name) },
+                    text = { Text(name) },
                     onClick = {
-                        onSelect(station.statnId)
+                        onSelect(id)
+                        query = name
                         expanded = false
                     },
                 )

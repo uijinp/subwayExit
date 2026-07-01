@@ -127,4 +127,19 @@ class StationGraphTest {
     fun `빈 목록은 예외`() {
         StationGraph(emptyList())
     }
+
+    @Test
+    fun `stationsBetween 은 진행 방향 순서대로 양끝 포함`() {
+        val g = line()
+        assertEquals(listOf("B", "C", "D"), g.stationsBetween("B", "D").map { it.statnId })
+        assertEquals(listOf("D", "C", "B"), g.stationsBetween("D", "B").map { it.statnId })
+        assertEquals(listOf("A", "B", "C", "D", "E"), g.stationsBetween("A", "E").map { it.statnId })
+    }
+
+    @Test
+    fun `stationsBetween 유효하지 않으면 빈 리스트`() {
+        val g = line()
+        assertTrue(g.stationsBetween("C", "C").isEmpty())
+        assertTrue(g.stationsBetween("A", "Z").isEmpty())
+    }
 }

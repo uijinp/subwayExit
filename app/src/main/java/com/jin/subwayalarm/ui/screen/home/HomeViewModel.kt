@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -24,17 +25,31 @@ class HomeViewModel @Inject constructor(
     private val nearestStation: NearestStationUseCase,
 ) : ViewModel() {
 
+    data class LineOption(val lineId: String, val lineName: String)
+
     data class UiState(
-        val lineId: String = "",
-        val lineName: String = "",
+        val lines: List<LineOption> = emptyList(),
+        val selectedLineId: String? = null,
         val stations: List<Station> = emptyList(),
         val originStatnId: String? = null,
         val destStatnId: String? = null,
         val detecting: Boolean = false,
         val detectMessage: String? = null,
     ) {
+        val selectedLineName: String
+            get() = lines.firstOrNull { it.lineId == selectedLineId }?.lineName.orEmpty()
+
         val canStart: Boolean
-            get() = originStatnId != null && destStatnId != null && originStatnId != destStatnId
+            get() = selectedLineId != null && originStatnId != null && destStatnId != null &&
+                originStatnId != destStatnId
+
+        /** 출발→목적지 남은 정거장 수(선택 완료 시). stations 는 order 정렬이라 인덱스 차 = 순번 차. */
+        val remainingStops: Int?
+            get() {
+                val o = stations.indexOfFirst { it.statnId == originStatnId }
+                val d = stations.indexOfFirst { it.statnId == destStatnId }
+                return if (o >= 0 && d >= 0 && o != d) abs(d - o) else null
+            }
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -43,9 +58,26 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             stationRepository.ensureSeeded()
-            val line = stationRepository.lineMetas().firstOrNull() ?: return@launch
-            val stations = stationRepository.stations(line.lineId)
-            _uiState.update { it.copy(lineId = line.lineId, lineName = line.lineName, stations = stations) }
+            val lines = stationRepository.lineMetas()
+                .sortedBy { it.lineId }
+                .map { LineOption(it.lineId, it.lineName) }
+            _uiState.update { it.copy(lines = lines) }
+            lines.firstOrNull()?.let { selectLine(it.lineId) }
+        }
+    }
+
+    fun selectLine(lineId: String) {
+        viewModelScope.launch {
+            val stations = stationRepository.stations(lineId)
+            _uiState.update {
+                it.copy(
+                    selectedLineId = lineId,
+                    stations = stations,
+                    originStatnId = null,
+                    destStatnId = null,
+                    detectMessage = null,
+                )
+            }
         }
     }
 
@@ -67,7 +99,9 @@ class HomeViewModel @Inject constructor(
             }
             val nearest = nearestStation(here, _uiState.value.stations)
             if (nearest == null) {
-                _uiState.update { it.copy(detecting = false, detectMessage = "근처에서 ${_uiState.value.lineName} 역을 찾지 못했어요") }
+                _uiState.update {
+                    it.copy(detecting = false, detectMessage = "근처에서 ${it.selectedLineName} 역을 찾지 못했어요")
+                }
             } else {
                 _uiState.update {
                     it.copy(
@@ -83,13 +117,14 @@ class HomeViewModel @Inject constructor(
     /** 추적 시작 전 여정을 먼저 저장(레이스 컨디션 방지 — TrackingService 는 이 값을 그대로 이어받는다). */
     suspend fun startTrip() {
         val state = _uiState.value
+        val lineId = state.selectedLineId ?: return
         val originId = state.originStatnId ?: return
         val destId = state.destStatnId ?: return
         tripSessionRepository.save(
             TripSession(
                 originStatnId = originId,
                 destStatnId = destId,
-                lineId = state.lineId,
+                lineId = lineId,
                 currentStatnId = originId,
                 lastSyncAtEpochMillis = System.currentTimeMillis(),
             ),

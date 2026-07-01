@@ -18,9 +18,13 @@ class StationRepositoryImpl @Inject constructor(
 ) : StationRepository {
 
     override suspend fun ensureSeeded() {
-        if (stationDao.countForLine(SubwaySeed.LINE_7_ID) > 0) return
-        lineMetaDao.upsertAll(listOf(SubwaySeed.line7Meta.toEntity()))
-        stationDao.upsertAll(SubwaySeed.line7Stations.map { it.toEntity() })
+        // 노선별 개별 시드(누락된 노선만) — 시드 목록이 늘어도 재설치 없이 반영됨.
+        SubwaySeed.allLines.forEach { seed ->
+            if (stationDao.countForLine(seed.meta.lineId) == 0) {
+                lineMetaDao.upsertAll(listOf(seed.meta.toEntity()))
+                stationDao.upsertAll(seed.stations.map { it.toEntity() })
+            }
+        }
     }
 
     override suspend fun lineMetas(): List<LineMeta> =
