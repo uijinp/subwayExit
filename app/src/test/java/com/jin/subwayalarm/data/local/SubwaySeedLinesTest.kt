@@ -64,8 +64,18 @@ class SubwaySeedLinesTest {
     }
 
     @Test
-    fun `현재 5개 노선(3·4·6·7·9호선) 수록`() {
+    fun `1호선(경인)은 청량리-인천 38역, statnId 는 base 124`() {
+        val g = StationGraph(SubwaySeed.line1Gyeongin.stations)
+        assertEquals(38, g.size)
+        assertEquals("청량리(서울시립대입구)", g.stations.first().name)
+        assertEquals("인천", g.stations.last().name)
+        assertEquals("1001000124", g.stations.first().statnId)
+        assertEquals("1001000161", g.stations.last().statnId) // 인천 실측 statnId
+    }
+
+    @Test
+    fun `현재 6개 노선(1·3·4·6·7·9호선) 수록`() {
         val ids = SubwaySeed.allLines.map { it.meta.lineId }.toSet()
-        assertEquals(setOf("1003", "1004", "1006", "1007", "1009"), ids)
+        assertEquals(setOf("1001", "1003", "1004", "1006", "1007", "1009"), ids)
     }
 }
