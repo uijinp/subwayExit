@@ -19,6 +19,8 @@ fun StationEntity.toDomain(): Station = Station(
     avgSecToNext = avgSecToNext,
     nextStatnId = nextStatnId,
     prevStatnId = prevStatnId,
+    lat = lat,
+    lon = lon,
 )
 
 fun Station.toEntity(): StationEntity = StationEntity(
@@ -29,6 +31,8 @@ fun Station.toEntity(): StationEntity = StationEntity(
     avgSecToNext = avgSecToNext,
     nextStatnId = nextStatnId,
     prevStatnId = prevStatnId,
+    lat = lat,
+    lon = lon,
 )
 
 fun LineMetaEntity.toDomain(): LineMeta = LineMeta(

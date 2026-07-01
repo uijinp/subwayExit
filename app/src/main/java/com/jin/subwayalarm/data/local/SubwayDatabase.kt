@@ -11,7 +11,7 @@ import com.jin.subwayalarm.data.local.entity.TripSessionEntity
 
 @Database(
     entities = [StationEntity::class, LineMetaEntity::class, TripSessionEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class SubwayDatabase : RoomDatabase() {

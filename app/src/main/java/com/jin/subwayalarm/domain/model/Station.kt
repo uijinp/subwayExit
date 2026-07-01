@@ -10,6 +10,7 @@ package com.jin.subwayalarm.domain.model
  * @param avgSecToNext 다음(ASCENDING) 역까지 평균 소요시간(초). recptnDt 보정용. 종착은 0.
  * @param nextStatnId  ASCENDING 방향 인접 역 (그래프 확장용, LINEAR 에선 order 로 파생 가능)
  * @param prevStatnId  DESCENDING 방향 인접 역
+ * @param lat/lon      역 위경도(출발역 자동감지용). 0.0/0.0 이면 미설정(감지 대상 제외).
  */
 data class Station(
     val statnId: String,
@@ -19,4 +20,8 @@ data class Station(
     val avgSecToNext: Int,
     val nextStatnId: String? = null,
     val prevStatnId: String? = null,
-)
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
+) {
+    val latLon: LatLon get() = LatLon(lat, lon)
+}

@@ -16,4 +16,6 @@ data class StationEntity(
     val avgSecToNext: Int,
     val nextStatnId: String?,
     val prevStatnId: String?,
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
 )

@@ -104,6 +104,9 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // 위치(출발역 자동감지, Wi-Fi/기지국 측위)
+    implementation(libs.play.services.location)
+
     // Unit test
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

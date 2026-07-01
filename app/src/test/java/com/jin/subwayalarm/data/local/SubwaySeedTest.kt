@@ -62,6 +62,15 @@ class SubwaySeedTest {
     }
 
     @Test
+    fun `모든 역이 위경도 좌표를 가진다(자동감지용)`() {
+        stations.forEach {
+            assertTrue("${it.name} 좌표 미설정", !it.latLon.isUnset)
+            assertTrue("${it.name} 위도 범위", it.lat in 37.0..38.0)
+            assertTrue("${it.name} 경도 범위", it.lon in 126.0..128.0)
+        }
+    }
+
+    @Test
     fun `시드 그래프에서 고속터미널→용마산 직전역은 중곡`() {
         val g = StationGraph(stations)
         val origin = stations.first { it.name == "고속터미널" }.statnId
