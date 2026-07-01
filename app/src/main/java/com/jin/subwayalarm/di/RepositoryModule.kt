@@ -1,5 +1,7 @@
 package com.jin.subwayalarm.di
 
+import com.jin.subwayalarm.data.repository.JourneyPlanRepository
+import com.jin.subwayalarm.data.repository.JourneyPlanRepositoryImpl
 import com.jin.subwayalarm.data.repository.StationRepository
 import com.jin.subwayalarm.data.repository.StationRepositoryImpl
 import com.jin.subwayalarm.data.repository.TrainPositionRepository
@@ -27,4 +29,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTripSessionRepository(impl: TripSessionRepositoryImpl): TripSessionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindJourneyPlanRepository(impl: JourneyPlanRepositoryImpl): JourneyPlanRepository
 }

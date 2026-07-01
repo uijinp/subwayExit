@@ -11,7 +11,9 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.jin.subwayalarm.R
+import com.jin.subwayalarm.alarm.AlarmContent
 import com.jin.subwayalarm.alarm.AlarmController
+import com.jin.subwayalarm.data.repository.JourneyPlanRepository
 import com.jin.subwayalarm.data.repository.PositionFetchResult
 import com.jin.subwayalarm.data.repository.StationRepository
 import com.jin.subwayalarm.data.repository.TrainPositionRepository
@@ -38,6 +40,7 @@ class TrackingService : LifecycleService() {
 
     @Inject lateinit var stationRepository: StationRepository
     @Inject lateinit var tripSessionRepository: TripSessionRepository
+    @Inject lateinit var journeyPlanRepository: JourneyPlanRepository
     @Inject lateinit var trainPositionRepository: TrainPositionRepository
     @Inject lateinit var trackingStep: TrackingStepUseCase
     @Inject lateinit var alarmController: AlarmController
@@ -50,7 +53,10 @@ class TrackingService : LifecycleService() {
 
         if (intent?.action == ACTION_STOP) {
             trackingJob?.cancel()
-            lifecycleScope.launch { tripSessionRepository.clear() }
+            lifecycleScope.launch {
+                tripSessionRepository.clear()
+                journeyPlanRepository.clear()
+            }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -96,10 +102,15 @@ class TrackingService : LifecycleService() {
                     val alert = result.alert
                     if (alert != null) {
                         val stationName = graph.station(alert.alertStationId)?.name.orEmpty()
-                        alarmController.trigger(stationName, AlarmSetting())
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                        stopSelf()
-                        return
+                        val nextLeg = journeyPlanRepository.current()?.takeIf { it.hasNextLeg }
+                            ?.let { it.legs[it.currentLegIndex + 1] }
+                        val content = if (nextLeg != null) {
+                            AlarmContent.Transfer(transferStationName = stationName, nextLineName = nextLeg.lineName)
+                        } else {
+                            AlarmContent.FinalDestination(destinationName = stationName)
+                        }
+                        alarmController.trigger(content, AlarmSetting())
+                        break
                     }
                     delay(PollingIntervalPolicy.intervalSeconds(remaining) * 1000L)
                 }
@@ -110,6 +121,10 @@ class TrackingService : LifecycleService() {
                 }
             }
         }
+        // 자연 종료(알람 발화·세션 없음·DONE·그래프 없음) 시 서비스도 함께 정리 — 좀비 FGS 방지.
+        // ACTION_STOP 경로는 trackingJob.cancel() 로 여기 오지 않고 onStartCommand 에서 직접 정리한다.
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun statusText(session: TripSession, remaining: Int): String =

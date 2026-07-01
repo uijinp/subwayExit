@@ -13,9 +13,9 @@ class AlarmController @Inject constructor(
     private val vibratorController: VibratorController,
     private val notificationHelper: NotificationHelper,
 ) {
-    fun trigger(stationName: String, setting: AlarmSetting) {
+    fun trigger(content: AlarmContent, setting: AlarmSetting) {
         vibratorController.start(setting.vibrationPattern, setting.repeatUntilDismissed)
-        notificationHelper.showAlertNotification(stationName)
+        notificationHelper.showAlertNotification(content)
         // TODO(step9): setting.soundEnabled=false 대응은 채널 분리 필요(Android O+ 채널 소리는
         // 생성 후 앱에서 변경 불가) — UI 설정 화면과 함께 설계.
     }

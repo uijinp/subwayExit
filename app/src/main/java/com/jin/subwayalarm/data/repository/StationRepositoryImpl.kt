@@ -8,6 +8,7 @@ import com.jin.subwayalarm.data.local.toEntity
 import com.jin.subwayalarm.domain.model.LineMeta
 import com.jin.subwayalarm.domain.model.Station
 import com.jin.subwayalarm.domain.model.StationGraph
+import com.jin.subwayalarm.domain.model.SubwayNetwork
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,5 +37,11 @@ class StationRepositoryImpl @Inject constructor(
     override suspend fun stationGraph(lineId: String): StationGraph? {
         val stations = stations(lineId)
         return if (stations.isEmpty()) null else StationGraph(stations)
+    }
+
+    override suspend fun buildNetwork(): SubwayNetwork {
+        val metas = lineMetas()
+        val perLine = metas.associate { it.lineId to stations(it.lineId) }
+        return SubwayNetwork(perLine, metas)
     }
 }

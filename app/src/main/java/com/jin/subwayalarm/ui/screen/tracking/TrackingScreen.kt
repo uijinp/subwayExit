@@ -48,12 +48,15 @@ fun TrackingScreen(
     onSessionEnded: () -> Unit,
     viewModel: TrackingViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val loadedState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(uiState.isActive) {
-        if (!uiState.isActive) onSessionEnded()
+    LaunchedEffect(loadedState) {
+        val state = loadedState
+        if (state != null && !state.isActive) onSessionEnded()
     }
+
+    val uiState = loadedState ?: return
 
     Scaffold(containerColor = DawatColors.DarkBg) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(DawatColors.DarkBg)) {
@@ -63,6 +66,8 @@ fun TrackingScreen(
                 AlarmBanner(
                     alertStationName = uiState.currentStationName,
                     destinationName = uiState.destinationName,
+                    isTransfer = uiState.isTransferLeg,
+                    nextLineName = uiState.nextLineName,
                     onAcknowledge = viewModel::acknowledgeAlarm,
                 )
             }
@@ -97,8 +102,9 @@ private fun Header(uiState: TrackingViewModel.UiState) {
                     Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(DawatColors.Green))
                     Spacer(modifier = Modifier.width(6.dp))
                     val statusLabel = if (uiState.state == TripState.MATCHING) "탑승 확인 중" else "추적 중"
+                    val legLabel = if (uiState.totalLegs > 1) " · ${uiState.currentLegNumber}/${uiState.totalLegs}구간" else ""
                     Text(
-                        "$statusLabel · ${uiState.lineName}",
+                        "$statusLabel · ${uiState.lineName}$legLabel",
                         style = MaterialTheme.typography.labelMedium,
                         color = DawatColors.OnDarkMuted,
                     )
@@ -125,7 +131,13 @@ private fun Header(uiState: TrackingViewModel.UiState) {
 }
 
 @Composable
-private fun AlarmBanner(alertStationName: String, destinationName: String, onAcknowledge: () -> Unit) {
+private fun AlarmBanner(
+    alertStationName: String,
+    destinationName: String,
+    isTransfer: Boolean,
+    nextLineName: String,
+    onAcknowledge: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -138,15 +150,17 @@ private fun AlarmBanner(alertStationName: String, destinationName: String, onAck
             Box(
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center,
-            ) { Text("🔔", fontSize = 18.sp) }
+            ) { Text(if (isTransfer) "🔄" else "🔔", fontSize = 18.sp) }
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text("이제 곧 내리세요!", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 17.sp)
-                Text(
-                    "$alertStationName 통과 · 다음 역 ${destinationName}에서 하차",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.9f),
-                )
+                val headline = if (isTransfer) "환승하세요!" else "이제 곧 내리세요!"
+                val detail = if (isTransfer) {
+                    "$alertStationName 통과 · 여기서 내려 ${nextLineName}으로 갈아타세요"
+                } else {
+                    "$alertStationName 통과 · 다음 역 ${destinationName}에서 하차"
+                }
+                Text(headline, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 17.sp)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
             }
         }
         Spacer(modifier = Modifier.height(14.dp))

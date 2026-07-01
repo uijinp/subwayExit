@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jin.subwayalarm.domain.model.Leg
 import com.jin.subwayalarm.tracking.TrackingService
 import com.jin.subwayalarm.ui.theme.DawatColors
 import kotlinx.coroutines.launch
@@ -80,24 +81,18 @@ fun HomeScreen(
                 Text("다왔다", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            // 경로 입력 카드
+            // 경로 입력 카드 (노선은 자동 결정 — 환승 필요하면 자동으로 계산됨)
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp)).background(DawatColors.Card)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SearchableDropdown(
-                    label = "노선",
-                    options = uiState.lines.map { it.lineId to it.lineName },
-                    selectedId = uiState.selectedLineId,
-                    onSelect = viewModel::selectLine,
-                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SearchableDropdown(
                         label = "출발역",
-                        options = uiState.stations.map { it.statnId to it.name },
-                        selectedId = uiState.originStatnId,
+                        options = uiState.allStations.map { it.name to "${it.name} · ${it.lineNames.joinToString("·")}" },
+                        selectedId = uiState.originName,
                         onSelect = viewModel::selectOrigin,
                         modifier = Modifier.weight(1f),
                     )
@@ -120,17 +115,20 @@ fun HomeScreen(
                 }
                 SearchableDropdown(
                     label = "목적지",
-                    options = uiState.stations.map { it.statnId to it.name },
-                    selectedId = uiState.destStatnId,
+                    options = uiState.allStations.map { it.name to "${it.name} · ${it.lineNames.joinToString("·")}" },
+                    selectedId = uiState.destinationName,
                     onSelect = viewModel::selectDestination,
                 )
             }
 
-            uiState.remainingStops?.let { remaining ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("목적지까지 ", style = MaterialTheme.typography.titleMedium)
-                    Text("$remaining 정거장", style = MaterialTheme.typography.titleMedium, color = DawatColors.GreenDeep, fontWeight = FontWeight.Bold)
-                }
+            when {
+                uiState.planning -> Text("경로 계산 중…", style = MaterialTheme.typography.bodyMedium, color = DawatColors.TextMuted)
+                uiState.routeError != null -> Text(
+                    uiState.routeError.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawatColors.Coral,
+                )
+                uiState.legs.isNotEmpty() -> RoutePreview(uiState.legs)
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -149,13 +147,48 @@ fun HomeScreen(
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                     scope.launch {
-                        viewModel.startTrip()
-                        ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
-                        onTripStarted()
+                        if (viewModel.startTrip()) {
+                            ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
+                            onTripStarted()
+                        }
                     }
                 },
             ) {
                 Text("▶ 추적 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+/** 계산된 여정 구간을 카드로 나열. 환승이 있으면 구간 사이에 "환승" 구분선 표시. */
+@Composable
+private fun RoutePreview(legs: List<Leg>) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        legs.forEachIndexed { index, leg ->
+            if (index > 0) {
+                Text(
+                    "↓ 환승",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DawatColors.TextMuted,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp)).background(DawatColors.GreenTint)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(DawatColors.Green)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) { Text(leg.lineName, color = DawatColors.OnGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "${leg.boardStationName} → ${leg.alightStationName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
     }

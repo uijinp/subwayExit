@@ -46,9 +46,16 @@ fun SubwayAlarmApp(alarmTrigger: Int) {
         }
         composable(Routes.ALARM) {
             AlarmScreen(
-                onDismissed = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(0) { inclusive = true }
+                onDismissed = { isTransfer ->
+                    if (isTransfer) {
+                        // 다음 구간이 이어짐 — 추적 화면으로(홈으로 리셋하지 않음).
+                        navController.navigate(Routes.TRACKING) {
+                            popUpTo(Routes.HOME) { inclusive = false }
+                        }
+                    } else {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 },
             )

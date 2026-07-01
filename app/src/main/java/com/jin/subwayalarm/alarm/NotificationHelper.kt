@@ -49,7 +49,7 @@ class NotificationHelper @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    fun showAlertNotification(stationName: String) {
+    fun showAlertNotification(content: AlarmContent) {
         ensureChannel()
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
 
@@ -70,10 +70,17 @@ class NotificationHelper @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val (title, text) = when (content) {
+            is AlarmContent.Transfer ->
+                "환승하세요" to "${content.transferStationName}역에서 내려 ${content.nextLineName}으로 갈아타세요"
+            is AlarmContent.FinalDestination ->
+                "하차 준비" to "${content.destinationName} 다음 역에서 내리세요"
+        }
+
         val notification = NotificationCompat.Builder(context, ALARM_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_alarm)
-            .setContentTitle("하차 준비")
-            .setContentText("$stationName 다음 역에서 내리세요")
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(fullScreenPendingIntent, true)

@@ -32,10 +32,13 @@ import com.jin.subwayalarm.ui.theme.DawatColors
 
 @Composable
 fun AlarmScreen(
-    onDismissed: () -> Unit,
+    /** isTransfer: 다음 구간이 있어 추적 화면으로 이어가야 하는지, 없으면(마지막) 홈으로. */
+    onDismissed: (isTransfer: Boolean) -> Unit,
     viewModel: AlarmViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val loadedState by viewModel.uiState.collectAsStateWithLifecycle()
+    // 로딩 전(null)에는 아무것도 그리지 않는다 — 기본값 isTransfer=false 로 환승 여정을 잘못 끝내는 것 방지.
+    val uiState = loadedState ?: return
 
     Scaffold(containerColor = DawatColors.Coral) { padding ->
         Column(
@@ -46,22 +49,25 @@ fun AlarmScreen(
             Box(
                 modifier = Modifier.size(88.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center,
-            ) { Text("🔔", fontSize = 40.sp) }
+            ) { Text(if (uiState.isTransfer) "🔄" else "🔔", fontSize = 40.sp) }
 
             Spacer(modifier = Modifier.height(28.dp))
-            Text("이제 곧 내리세요!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            val headline = if (uiState.isTransfer) "환승하세요!" else "이제 곧 내리세요!"
+            Text(headline, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
             Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                "다음 역 ${uiState.destinationName}에서 하차",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.92f),
-            )
+            val detail = if (uiState.isTransfer) {
+                "여기서 내려 ${uiState.nextLineName}으로 갈아타세요"
+            } else {
+                "다음 역 ${uiState.destinationName}에서 하차"
+            }
+            Text(detail, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.92f))
 
             Spacer(modifier = Modifier.height(40.dp))
             Button(
                 onClick = {
+                    val isTransfer = uiState.isTransfer
                     viewModel.dismiss()
-                    onDismissed()
+                    onDismissed(isTransfer)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = DawatColors.Coral),
                 shape = RoundedCornerShape(16.dp),
