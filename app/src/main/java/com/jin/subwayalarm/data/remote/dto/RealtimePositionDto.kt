@@ -5,8 +5,12 @@ import com.squareup.moshi.JsonClass
 
 /**
  * 서울 열린데이터광장 realtimePosition 응답 DTO.
- * ⚠️ 필드명·구조는 설계 기준값 — 작업순서 3(실측 검증 스파이크)에서
- * 최신 Swagger/공공데이터포털 명세로 재검증할 것 (2-2 참조).
+ *
+ * 작업순서 3(2026-07-01) 실측으로 아래 필드는 실응답과 일치 확인됨(7호선 44건 샘플 +
+ * 75초 간격 3회 시계열). 응답에는 이 외에도 subwayNm(노선명), statnTid/statnTnm
+ * (해당 열차의 종착역 ID/명 — updnLine 극성 교차검증에 사용, SubwaySeed 참조),
+ * lastRecptnDt(날짜만), 페이징 메타(rowNum 등) 필드가 더 있으나 Moshi 는 미선언 필드를
+ * 안전하게 무시하므로 별도 매핑하지 않았다.
  */
 @JsonClass(generateAdapter = true)
 data class RealtimePositionResponseDto(
