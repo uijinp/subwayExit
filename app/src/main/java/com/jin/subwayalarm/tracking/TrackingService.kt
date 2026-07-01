@@ -58,25 +58,10 @@ class TrackingService : LifecycleService() {
 
         startForeground(TRACKING_NOTIFICATION_ID, buildNotification("추적 준비 중"))
 
-        val lineId = intent?.getStringExtra(EXTRA_LINE_ID)
-        val originId = intent?.getStringExtra(EXTRA_ORIGIN_STATN_ID)
-        val destId = intent?.getStringExtra(EXTRA_DEST_STATN_ID)
-
+        // 여정 생성은 UI(HomeViewModel)의 책임 — 서비스 시작 전에 TripSession 이 이미 저장돼 있어야 한다.
+        // 서비스는 항상 Room 에 있는 세션을 그대로 이어받아 추적만 한다(레이스 컨디션 방지, 재시작 시에도 동일 경로).
         trackingJob?.cancel()
-        trackingJob = lifecycleScope.launch {
-            if (lineId != null && originId != null && destId != null) {
-                tripSessionRepository.save(
-                    TripSession(
-                        originStatnId = originId,
-                        destStatnId = destId,
-                        lineId = lineId,
-                        currentStatnId = originId,
-                        lastSyncAtEpochMillis = System.currentTimeMillis(),
-                    ),
-                )
-            }
-            runTrackingLoop()
-        }
+        trackingJob = lifecycleScope.launch { runTrackingLoop() }
 
         // 프로세스가 죽어도 마지막 Intent 로 재전달 — TripSession(영속화됨)으로 이어받아 재개(4-1).
         return START_REDELIVER_INTENT
@@ -162,19 +147,12 @@ class TrackingService : LifecycleService() {
     }
 
     companion object {
-        const val EXTRA_LINE_ID = "com.jin.subwayalarm.extra.LINE_ID"
-        const val EXTRA_ORIGIN_STATN_ID = "com.jin.subwayalarm.extra.ORIGIN_STATN_ID"
-        const val EXTRA_DEST_STATN_ID = "com.jin.subwayalarm.extra.DEST_STATN_ID"
         private const val ACTION_STOP = "com.jin.subwayalarm.action.STOP_TRACKING"
         private const val TRACKING_CHANNEL_ID = "tracking"
         private const val TRACKING_NOTIFICATION_ID = 2001
 
-        fun startIntent(context: Context, lineId: String, originStatnId: String, destStatnId: String): Intent =
-            Intent(context, TrackingService::class.java).apply {
-                putExtra(EXTRA_LINE_ID, lineId)
-                putExtra(EXTRA_ORIGIN_STATN_ID, originStatnId)
-                putExtra(EXTRA_DEST_STATN_ID, destStatnId)
-            }
+        /** 호출 전 TripSessionRepository.save() 로 여정을 먼저 저장해 둘 것(HomeViewModel 참조). */
+        fun startIntent(context: Context): Intent = Intent(context, TrackingService::class.java)
 
         fun stopIntent(context: Context): Intent =
             Intent(context, TrackingService::class.java).apply { action = ACTION_STOP }
