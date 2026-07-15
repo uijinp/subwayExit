@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jin.subwayalarm.ui.screen.alarm.AlarmScreen
 import com.jin.subwayalarm.ui.screen.home.HomeScreen
+import com.jin.subwayalarm.ui.screen.linemap.LineMapScreen
 import com.jin.subwayalarm.ui.screen.tracking.TrackingScreen
 
 private object Routes {
     const val HOME = "home"
     const val TRACKING = "tracking"
     const val ALARM = "alarm"
+    const val LINE_MAP = "line_map"
 }
 
 /**
@@ -35,6 +37,14 @@ fun SubwayAlarmApp(alarmTrigger: Int) {
                 onTripStarted = {
                     navController.navigate(Routes.TRACKING)
                 },
+                onOpenLineMap = {
+                    navController.navigate(Routes.LINE_MAP)
+                },
+            )
+        }
+        composable(Routes.LINE_MAP) {
+            LineMapScreen(
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.TRACKING) {

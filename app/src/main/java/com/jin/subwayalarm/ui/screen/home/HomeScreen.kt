@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onTripStarted: () -> Unit,
+    onOpenLineMap: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,6 +80,10 @@ fun HomeScreen(
                 ) { Text("다", color = DawatColors.OnDark, fontWeight = FontWeight.Bold, fontSize = 18.sp) }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text("다왔다", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = onOpenLineMap, shape = RoundedCornerShape(12.dp)) {
+                    Text("🚇 노선 현황", fontSize = 13.sp)
+                }
             }
 
             // 경로 입력 카드 (노선은 자동 결정 — 환승 필요하면 자동으로 계산됨)
