@@ -68,7 +68,7 @@ class HomeViewModel @Inject constructor(
 
             val options = allStationsFlat
                 .groupBy { it.name }
-                .map { (name, stations) -> StationOption(name, stations.map { net.lineName(it.lineId) }.distinct()) }
+                .map { (name, stations) -> StationOption(name, stations.map { net.displayName(it.lineId) }.distinct()) }
                 .sortedBy { it.name }
             _uiState.update { it.copy(allStations = options) }
         }

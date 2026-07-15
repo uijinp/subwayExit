@@ -34,6 +34,13 @@ class TrainPositionMapperTest {
         assertEquals(TrainStatus.ARRIVED, result.status)
         assertTrue(!result.isExpress)
         assertTrue(!result.isLastTrain)
+        assertEquals(null, result.terminusName)
+    }
+
+    @Test
+    fun `statnTnm 은 terminusName 으로 매핑`() {
+        val result = validDto().copy(statnTnm = "인천").toDomainOrNull()
+        assertEquals("인천", result!!.terminusName)
     }
 
     @Test

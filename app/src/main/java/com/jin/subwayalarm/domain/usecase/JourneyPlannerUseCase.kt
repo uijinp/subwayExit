@@ -76,7 +76,7 @@ class JourneyPlannerUseCase @Inject constructor() {
                 legs.add(
                     Leg(
                         lineId = legStart.lineId,
-                        lineName = network.lineName(legStart.lineId),
+                        lineName = network.displayName(legStart.lineId),
                         boardStationName = legStart.stationName,
                         alightStationName = prevState.stationName,
                     ),
@@ -87,7 +87,7 @@ class JourneyPlannerUseCase @Inject constructor() {
         legs.add(
             Leg(
                 lineId = legStart.lineId,
-                lineName = network.lineName(legStart.lineId),
+                lineName = network.displayName(legStart.lineId),
                 boardStationName = legStart.stationName,
                 alightStationName = path.last().stationName,
             ),

@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.jin.subwayalarm.R
 import com.jin.subwayalarm.alarm.AlarmContent
 import com.jin.subwayalarm.alarm.AlarmController
+import com.jin.subwayalarm.data.repository.BoardingCandidateRepository
 import com.jin.subwayalarm.data.repository.JourneyPlanRepository
 import com.jin.subwayalarm.data.repository.PositionFetchResult
 import com.jin.subwayalarm.data.repository.StationRepository
@@ -22,18 +23,25 @@ import com.jin.subwayalarm.domain.model.AlarmSetting
 import com.jin.subwayalarm.domain.model.TrackingMode
 import com.jin.subwayalarm.domain.model.TripSession
 import com.jin.subwayalarm.domain.model.TripState
+import com.jin.subwayalarm.domain.usecase.AccelStopCounter
+import com.jin.subwayalarm.domain.usecase.ConfirmBoardedTrainUseCase
+import com.jin.subwayalarm.domain.usecase.HybridCoordinator
+import com.jin.subwayalarm.domain.usecase.HybridInput
+import com.jin.subwayalarm.domain.usecase.RecptnDtCorrector
 import com.jin.subwayalarm.domain.usecase.TrackingStepInput
 import com.jin.subwayalarm.domain.usecase.TrackingStepUseCase
+import com.jin.subwayalarm.tracking.sensor.LinearAccelerationSource
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 추적 Foreground Service (FGS type = dataSync, 4-1). API 단독 추적(작업순서 7, "MVP 핵심").
- * 2차(가속도계·HybridCoordinator)는 작업순서 11에서 합류.
+ * 추적 Foreground Service (FGS type = dataSync).
+ * API 폴링 + (옵션) 가속도계 하이브리드 + 수동 재매칭 인텐트.
  */
 @AndroidEntryPoint
 class TrackingService : LifecycleService() {
@@ -42,35 +50,81 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var tripSessionRepository: TripSessionRepository
     @Inject lateinit var journeyPlanRepository: JourneyPlanRepository
     @Inject lateinit var trainPositionRepository: TrainPositionRepository
+    @Inject lateinit var boardingCandidateRepository: BoardingCandidateRepository
     @Inject lateinit var trackingStep: TrackingStepUseCase
+    @Inject lateinit var confirmBoardedTrain: ConfirmBoardedTrainUseCase
     @Inject lateinit var alarmController: AlarmController
+    @Inject lateinit var linearAccelerationSource: LinearAccelerationSource
 
     private var trackingJob: Job? = null
+    private var sensorJob: Job? = null
     private var consecutiveFailures = 0
+    private val accelCounter = AccelStopCounter()
+    private var sensorEnabled = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
 
-        if (intent?.action == ACTION_STOP) {
-            trackingJob?.cancel()
-            lifecycleScope.launch {
-                tripSessionRepository.clear()
-                journeyPlanRepository.clear()
+        when (intent?.action) {
+            ACTION_STOP -> {
+                trackingJob?.cancel()
+                stopSensor()
+                lifecycleScope.launch {
+                    tripSessionRepository.clear()
+                    journeyPlanRepository.clear()
+                    boardingCandidateRepository.clear()
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return START_NOT_STICKY
             }
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
+            ACTION_CONFIRM_TRAIN -> {
+                val trainNo = intent.getStringExtra(EXTRA_TRAIN_NO)
+                if (!trainNo.isNullOrBlank()) {
+                    lifecycleScope.launch { confirmTrain(trainNo) }
+                }
+                return START_STICKY
+            }
+            ACTION_REQUEST_REMATCH -> {
+                lifecycleScope.launch { publishRematchCandidates() }
+                return START_STICKY
+            }
         }
 
         startForeground(TRACKING_NOTIFICATION_ID, buildNotification("추적 준비 중"))
-
-        // 여정 생성은 UI(HomeViewModel)의 책임 — 서비스 시작 전에 TripSession 이 이미 저장돼 있어야 한다.
-        // 서비스는 항상 Room 에 있는 세션을 그대로 이어받아 추적만 한다(레이스 컨디션 방지, 재시작 시에도 동일 경로).
         trackingJob?.cancel()
         trackingJob = lifecycleScope.launch { runTrackingLoop() }
-
-        // 프로세스가 죽어도 마지막 Intent 로 재전달 — TripSession(영속화됨)으로 이어받아 재개(4-1).
         return START_REDELIVER_INTENT
+    }
+
+    private suspend fun confirmTrain(trainNo: String) {
+        val session = tripSessionRepository.current() ?: return
+        val updated = confirmBoardedTrain(session, trainNo, System.currentTimeMillis())
+        tripSessionRepository.save(updated)
+        boardingCandidateRepository.clear()
+        accelCounter.resync()
+    }
+
+    private suspend fun publishRematchCandidates() {
+        val session = tripSessionRepository.current() ?: return
+        val graph = stationRepository.stationGraph(session.lineId) ?: return
+        val lineMeta = stationRepository.lineMetas().firstOrNull { it.lineId == session.lineId } ?: return
+        when (val fetch = trainPositionRepository.fetchRealtimePosition(lineMeta.lineName)) {
+            is PositionFetchResult.Success -> {
+                val candidates = trackingStep.listRematchCandidates(
+                    TrackingStepInput(
+                        graph = graph,
+                        session = session,
+                        positions = fetch.positions,
+                        nowEpochMillis = System.currentTimeMillis(),
+                        polarity = lineMeta.directionPolarity,
+                        excludedTerminusNames = lineMeta.excludedTerminusNames,
+                    ),
+                )
+                boardingCandidateRepository.publish(candidates)
+            }
+            else -> Unit
+        }
     }
 
     private suspend fun runTrackingLoop() {
@@ -85,22 +139,68 @@ class TrackingService : LifecycleService() {
             when (val fetch = trainPositionRepository.fetchRealtimePosition(lineMeta.lineName)) {
                 is PositionFetchResult.Success -> {
                     consecutiveFailures = 0
+                    val now = System.currentTimeMillis()
+                    val direction = graph.directionBetween(session.originStatnId, session.destStatnId)
+                    val boarded = session.boardedTrainNo
+                    val train = boarded?.let { no -> fetch.positions.firstOrNull { it.trainNo == no } }
+
+                    val apiCorrectedId = if (train != null) {
+                        RecptnDtCorrector.correct(
+                            graph = graph,
+                            rawStatnId = train.statnId,
+                            direction = direction,
+                            recptnDtEpochMillis = train.recptnDtEpochMillis,
+                            nowEpochMillis = now,
+                        ).statnId
+                    } else {
+                        null
+                    }
+
+                    val hybrid = if (session.boardedTrainNo != null) {
+                        HybridCoordinator.coordinate(
+                            HybridInput(
+                                graph = graph,
+                                direction = direction,
+                                lastKnownStatnId = session.currentStatnId,
+                                apiCorrectedStatnId = apiCorrectedId,
+                                accelStopCountSinceResync = accelCounter.stopCount,
+                            ),
+                        )
+                    } else {
+                        null
+                    }
+
+                    if (hybrid?.shouldResyncCounter == true) {
+                        accelCounter.resync()
+                    }
+                    setSensorEnabled(hybrid?.pauseSensor == false && session.boardedTrainNo != null)
+
+                    val accelEstimate = if (train == null && hybrid != null && hybrid.mode == TrackingMode.ACCEL) {
+                        hybrid.estimatedStatnId
+                    } else {
+                        null
+                    }
+
                     val result = trackingStep(
                         TrackingStepInput(
                             graph = graph,
                             session = session,
                             positions = fetch.positions,
-                            nowEpochMillis = System.currentTimeMillis(),
+                            nowEpochMillis = now,
                             polarity = lineMeta.directionPolarity,
+                            excludedTerminusNames = lineMeta.excludedTerminusNames,
+                            accelEstimatedStatnId = accelEstimate,
                         ),
                     )
                     tripSessionRepository.save(result.updatedSession)
+                    boardingCandidateRepository.publish(result.boardingCandidates)
 
                     val remaining = graph.remainingStops(result.updatedSession.currentStatnId, session.destStatnId)
                     updateNotification(buildNotification(statusText(result.updatedSession, remaining)))
 
                     val alert = result.alert
                     if (alert != null) {
+                        stopSensor()
                         val stationName = graph.station(alert.alertStationId)?.name.orEmpty()
                         val nextLeg = journeyPlanRepository.current()?.takeIf { it.hasNextLeg }
                             ?.let { it.legs[it.currentLegIndex + 1] }
@@ -112,7 +212,6 @@ class TrackingService : LifecycleService() {
                         alarmController.trigger(content, AlarmSetting())
                         break
                     }
-                    // 탑승 확인 중엔 출발역 정차 창(~30초)을 놓치지 않게 거리와 무관하게 짧은 주기.
                     val intervalSeconds = if (result.updatedSession.state == TripState.MATCHING) {
                         PollingIntervalPolicy.MATCHING_INTERVAL_SECONDS
                     } else {
@@ -122,15 +221,71 @@ class TrackingService : LifecycleService() {
                 }
                 is PositionFetchResult.RateLimited, is PositionFetchResult.Error -> {
                     consecutiveFailures++
+                    // 네트워크 실패 시에도 센서 추정으로 한 틱 시도
+                    val sessionNow = tripSessionRepository.current()
+                    if (sessionNow?.boardedTrainNo != null) {
+                        setSensorEnabled(true)
+                        val graph2 = stationRepository.stationGraph(sessionNow.lineId)
+                        if (graph2 != null) {
+                            val direction = graph2.directionBetween(sessionNow.originStatnId, sessionNow.destStatnId)
+                            val hybrid = HybridCoordinator.coordinate(
+                                HybridInput(
+                                    graph = graph2,
+                                    direction = direction,
+                                    lastKnownStatnId = sessionNow.currentStatnId,
+                                    apiCorrectedStatnId = null,
+                                    accelStopCountSinceResync = accelCounter.stopCount,
+                                ),
+                            )
+                            val result = trackingStep(
+                                TrackingStepInput(
+                                    graph = graph2,
+                                    session = sessionNow,
+                                    positions = emptyList(),
+                                    nowEpochMillis = System.currentTimeMillis(),
+                                    polarity = lineMeta.directionPolarity,
+                                    excludedTerminusNames = lineMeta.excludedTerminusNames,
+                                    accelEstimatedStatnId = hybrid.estimatedStatnId,
+                                ),
+                            )
+                            tripSessionRepository.save(result.updatedSession)
+                            if (result.alert != null) {
+                                stopSensor()
+                                val stationName = graph2.station(result.alert.alertStationId)?.name.orEmpty()
+                                alarmController.trigger(
+                                    AlarmContent.FinalDestination(destinationName = stationName),
+                                    AlarmSetting(),
+                                )
+                                break
+                            }
+                        }
+                    }
                     updateNotification(buildNotification("갱신 지연 중…"))
                     delay(PollingIntervalPolicy.backoffSeconds(consecutiveFailures) * 1000L)
                 }
             }
         }
-        // 자연 종료(알람 발화·세션 없음·DONE·그래프 없음) 시 서비스도 함께 정리 — 좀비 FGS 방지.
-        // ACTION_STOP 경로는 trackingJob.cancel() 로 여기 오지 않고 onStartCommand 에서 직접 정리한다.
+        stopSensor()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun setSensorEnabled(enabled: Boolean) {
+        if (enabled == sensorEnabled) return
+        sensorEnabled = enabled
+        sensorJob?.cancel()
+        if (!enabled) return
+        sensorJob = lifecycleScope.launch {
+            linearAccelerationSource.samples(true).collectLatest { sample ->
+                accelCounter.onSample(sample.magnitude, sample.epochMillis)
+            }
+        }
+    }
+
+    private fun stopSensor() {
+        sensorEnabled = false
+        sensorJob?.cancel()
+        sensorJob = null
     }
 
     private fun statusText(session: TripSession, remaining: Int): String =
@@ -169,13 +324,24 @@ class TrackingService : LifecycleService() {
 
     companion object {
         private const val ACTION_STOP = "com.jin.subwayalarm.action.STOP_TRACKING"
+        const val ACTION_CONFIRM_TRAIN = "com.jin.subwayalarm.action.CONFIRM_TRAIN"
+        const val ACTION_REQUEST_REMATCH = "com.jin.subwayalarm.action.REQUEST_REMATCH"
+        const val EXTRA_TRAIN_NO = "trainNo"
         private const val TRACKING_CHANNEL_ID = "tracking"
         private const val TRACKING_NOTIFICATION_ID = 2001
 
-        /** 호출 전 TripSessionRepository.save() 로 여정을 먼저 저장해 둘 것(HomeViewModel 참조). */
         fun startIntent(context: Context): Intent = Intent(context, TrackingService::class.java)
 
         fun stopIntent(context: Context): Intent =
             Intent(context, TrackingService::class.java).apply { action = ACTION_STOP }
+
+        fun confirmTrainIntent(context: Context, trainNo: String): Intent =
+            Intent(context, TrackingService::class.java).apply {
+                action = ACTION_CONFIRM_TRAIN
+                putExtra(EXTRA_TRAIN_NO, trainNo)
+            }
+
+        fun rematchIntent(context: Context): Intent =
+            Intent(context, TrackingService::class.java).apply { action = ACTION_REQUEST_REMATCH }
     }
 }

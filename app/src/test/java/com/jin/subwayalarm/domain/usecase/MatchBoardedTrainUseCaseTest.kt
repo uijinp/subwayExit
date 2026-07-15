@@ -19,6 +19,7 @@ class MatchBoardedTrainUseCaseTest {
         updnLine: String,
         status: TrainStatus,
         lineId: String = "L",
+        terminusName: String? = null,
     ) = TrainPosition(
         lineId = lineId,
         trainNo = trainNo,
@@ -29,14 +30,15 @@ class MatchBoardedTrainUseCaseTest {
         isExpress = false,
         isLastTrain = false,
         recptnDtEpochMillis = 0L,
+        terminusName = terminusName,
     )
 
     @Test
     fun `방향과 상태가 일치하는 후보가 1개면 확정`() {
         val positions = listOf(
             position("101", "ORIGIN", updnLine = "0", status = TrainStatus.ARRIVED),
-            position("102", "ORIGIN", updnLine = "1", status = TrainStatus.ARRIVED), // 반대 방향
-            position("103", "OTHER", updnLine = "0", status = TrainStatus.ARRIVED), // 다른 역
+            position("102", "ORIGIN", updnLine = "1", status = TrainStatus.ARRIVED),
+            position("103", "OTHER", updnLine = "0", status = TrainStatus.ARRIVED),
         )
         val result = useCase(positions, "L", "ORIGIN", Direction.ASCENDING, polarity)
         assertTrue(result is BoardingMatch.Matched)
@@ -57,7 +59,7 @@ class MatchBoardedTrainUseCaseTest {
         )
         val result = useCase(positions, "L", "ORIGIN", Direction.ASCENDING, polarity)
         assertTrue(result is BoardingMatch.Ambiguous)
-        assertEquals(2, (result as BoardingMatch.Ambiguous).candidateTrainNos.size)
+        assertEquals(2, (result as BoardingMatch.Ambiguous).candidates.size)
     }
 
     @Test
@@ -72,5 +74,19 @@ class MatchBoardedTrainUseCaseTest {
         val positions = listOf(position("101", "ORIGIN", updnLine = "0", status = TrainStatus.ARRIVED, lineId = "OTHER_LINE"))
         val result = useCase(positions, "L", "ORIGIN", Direction.ASCENDING, polarity)
         assertEquals(BoardingMatch.NoCandidate, result)
+    }
+
+    @Test
+    fun `경부 종착 열차는 제외 목록으로 걸러진다`() {
+        val positions = listOf(
+            position("101", "ORIGIN", updnLine = "0", status = TrainStatus.ARRIVED, terminusName = "수원"),
+            position("102", "ORIGIN", updnLine = "0", status = TrainStatus.ARRIVED, terminusName = "인천"),
+        )
+        val result = useCase(
+            positions, "L", "ORIGIN", Direction.ASCENDING, polarity,
+            excludedTerminusNames = setOf("수원", "천안"),
+        )
+        assertTrue(result is BoardingMatch.Matched)
+        assertEquals("102", (result as BoardingMatch.Matched).trainNo)
     }
 }

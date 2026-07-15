@@ -85,7 +85,7 @@ fun LineMapScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     ) {
                         Text(
-                            line.lineName,
+                            line.displayName.ifBlank { line.lineName },
                             color = if (selected) DawatColors.OnGreen else DawatColors.TextMuted,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,

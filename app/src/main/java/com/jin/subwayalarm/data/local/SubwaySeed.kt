@@ -32,6 +32,8 @@ object SubwaySeed {
         ascendingUpdnLine: String,
         statnIdBase: Int,
         raws: List<RawStation>,
+        displayName: String = lineName,
+        excludedTerminusNames: Set<String> = emptySet(),
     ): LineSeed {
         fun statnId(order: Int): String = "%s%06d".format(lineId, statnIdBase + order)
         val stations = raws.mapIndexed { i, raw ->
@@ -53,9 +55,18 @@ object SubwaySeed {
             supportsRealtime = true,
             topology = LineTopology.LINEAR,
             directionPolarity = DirectionPolarity(ascendingUpdnLine),
+            displayName = displayName,
+            excludedTerminusNames = excludedTerminusNames,
         )
         return LineSeed(meta, stations)
     }
+
+    /** 1호선 경부 방면 종착 — 경인 시드 매칭에서 제외 (DATA_AUDIT D-4). */
+    val LINE1_GYEONGBU_TERMINI: Set<String> = setOf(
+        "수원", "병점", "서동탄", "세류", "천안", "신창", "광명", "서정리", "평택",
+        "두정", "직산", "성환", "오산", "송탄", "지제", "세마", "당정", "군포",
+        "의왕", "성균관대", "화서", "금정", "안양", "관악", "석수", "금천구청", "독산",
+    )
 
     /** 7호선: 장암(0) → 석남(52). base=709, ascending=updnLine "1"(석남 방향). 실측 44건+시계열 검증. */
     val line7: LineSeed = buildLine(
@@ -299,7 +310,9 @@ object SubwaySeed {
      */
     val line1Gyeongin: LineSeed = buildLine(
         "1001", "1호선", "1", 124,
-        listOf(
+        displayName = "1호선 (경인 청량리–인천)",
+        excludedTerminusNames = LINE1_GYEONGBU_TERMINI,
+        raws = listOf(
             RawStation("청량리(서울시립대입구)", 37.579956, 127.044585),
             RawStation("제기동", 37.578103, 127.034893),
             RawStation("신설동", 37.576048, 127.024634),

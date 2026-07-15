@@ -32,5 +32,6 @@ fun TrainPositionDto.toDomainOrNull(): TrainPosition? {
         isExpress = directAt == "1",
         isLastTrain = lstcarAt == "1",
         recptnDtEpochMillis = recptnDtMillis,
+        terminusName = statnTnm?.trim()?.takeIf { it.isNotEmpty() },
     )
 }

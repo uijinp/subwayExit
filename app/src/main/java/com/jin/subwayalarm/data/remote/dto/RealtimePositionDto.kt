@@ -36,4 +36,6 @@ data class TrainPositionDto(
     @Json(name = "directAt") val directAt: String? = null,
     @Json(name = "lstcarAt") val lstcarAt: String? = null,
     @Json(name = "recptnDt") val recptnDt: String? = null,
+    /** 종착역명 — 1호선 분기 매칭 필터 (DATA_AUDIT D-3). */
+    @Json(name = "statnTnm") val statnTnm: String? = null,
 )

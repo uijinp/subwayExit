@@ -128,6 +128,37 @@ class TrackingStepUseCaseTest {
     }
 
     @Test
+    fun `추적 단계 - API 소실이어도 가속도 추정 역이 있으면 재판정`() {
+        val now = 10_000L
+        val input = TrackingStepInput(
+            graph(),
+            trackingSession(now, currentStatnId = "B"),
+            positions = emptyList(),
+            nowEpochMillis = now,
+            polarity = polarity,
+            accelEstimatedStatnId = "C",
+        )
+        val result = useCase(input)
+        assertNotNull(result.alert)
+        assertEquals(TripState.ALERTED, result.updatedSession.state)
+        assertEquals(TrackingMode.ACCEL, result.updatedSession.mode)
+    }
+
+    @Test
+    fun `매칭 단계 - 후보 2개면 MATCHING 유지하고 후보 목록 반환`() {
+        val now = 10_000L
+        val positions = listOf(
+            position("T1", "A", TrainStatus.ARRIVED, recptnDt = now),
+            position("T2", "A", TrainStatus.APPROACHING, recptnDt = now),
+        )
+        val input = TrackingStepInput(graph(), matchingSession(now), positions, now, polarity)
+        val result = useCase(input)
+        assertEquals(TripState.MATCHING, result.updatedSession.state)
+        assertNull(result.updatedSession.boardedTrainNo)
+        assertEquals(2, result.boardingCandidates.size)
+    }
+
+    @Test
     fun `이미 ALERTED 면 조건 충족해도 재트리거 없음`() {
         val now = 10_000L
         val alerted = trackingSession(now, currentStatnId = "C").copy(state = TripState.ALERTED)

@@ -2,6 +2,7 @@ package com.jin.subwayalarm.data.local
 
 import com.jin.subwayalarm.domain.model.StationGraph
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,6 +72,16 @@ class SubwaySeedLinesTest {
         assertEquals("인천", g.stations.last().name)
         assertEquals("1001000124", g.stations.first().statnId)
         assertEquals("1001000161", g.stations.last().statnId) // 인천 실측 statnId
+    }
+
+    @Test
+    fun `1호선 표시명은 경인 구간 고지, 경부 종착 필터가 있다`() {
+        val meta = SubwaySeed.line1Gyeongin.meta
+        assertTrue(meta.displayName.contains("경인"))
+        assertTrue(meta.excludedTerminusNames.contains("수원"))
+        val names = SubwaySeed.line1Gyeongin.stations.map { it.name }.toSet()
+        assertFalse(names.contains("수원"))
+        assertFalse(names.contains("회기"))
     }
 
     @Test

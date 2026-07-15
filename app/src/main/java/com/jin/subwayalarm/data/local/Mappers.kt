@@ -35,13 +35,19 @@ fun Station.toEntity(): StationEntity = StationEntity(
     lon = lon,
 )
 
-fun LineMetaEntity.toDomain(): LineMeta = LineMeta(
-    lineId = lineId,
-    lineName = lineName,
-    supportsRealtime = supportsRealtime,
-    topology = runCatching { LineTopology.valueOf(topology) }.getOrDefault(LineTopology.LINEAR),
-    directionPolarity = ascendingUpdnLine?.let { DirectionPolarity(it) },
-)
+fun LineMetaEntity.toDomain(): LineMeta {
+    // displayName·종착 필터는 Room 에 두지 않고 시드 메타를 병합 (스키마 마이그레이션 회피).
+    val seedMeta = SubwaySeed.allLines.firstOrNull { it.meta.lineId == lineId }?.meta
+    return LineMeta(
+        lineId = lineId,
+        lineName = lineName,
+        supportsRealtime = supportsRealtime,
+        topology = runCatching { LineTopology.valueOf(topology) }.getOrDefault(LineTopology.LINEAR),
+        directionPolarity = ascendingUpdnLine?.let { DirectionPolarity(it) },
+        displayName = seedMeta?.displayName ?: lineName,
+        excludedTerminusNames = seedMeta?.excludedTerminusNames.orEmpty(),
+    )
+}
 
 fun LineMeta.toEntity(): LineMetaEntity = LineMetaEntity(
     lineId = lineId,
