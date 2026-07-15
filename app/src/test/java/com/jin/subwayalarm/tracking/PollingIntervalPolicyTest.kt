@@ -1,6 +1,7 @@
 package com.jin.subwayalarm.tracking
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PollingIntervalPolicyTest {
@@ -38,9 +39,14 @@ class PollingIntervalPolicyTest {
     }
 
     @Test
-    fun `백오프는 600초를 넘지 않음`() {
-        assertEquals(480L, PollingIntervalPolicy.backoffSeconds(6))
-        assertEquals(600L, PollingIntervalPolicy.backoffSeconds(7))
-        assertEquals(600L, PollingIntervalPolicy.backoffSeconds(100))
+    fun `백오프는 120초를 넘지 않음 - 추적은 시간에 민감`() {
+        assertEquals(120L, PollingIntervalPolicy.backoffSeconds(5))
+        assertEquals(120L, PollingIntervalPolicy.backoffSeconds(7))
+        assertEquals(120L, PollingIntervalPolicy.backoffSeconds(100))
+    }
+
+    @Test
+    fun `탑승 확인 중 주기는 정차 창(30초)보다 짧아야 함`() {
+        assertTrue(PollingIntervalPolicy.MATCHING_INTERVAL_SECONDS < 30L)
     }
 }

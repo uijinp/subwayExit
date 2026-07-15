@@ -1,5 +1,6 @@
 package com.jin.subwayalarm.domain.usecase
 
+import com.jin.subwayalarm.domain.model.Direction
 import com.jin.subwayalarm.domain.model.StationGraph
 import com.jin.subwayalarm.domain.model.TrainStatus
 import javax.inject.Inject
@@ -24,6 +25,9 @@ sealed class AlertEvaluation {
 
         /** B) 직전역의 한 정거장 전에서 출발(보수적 조기 알람) */
         DEPARTED_STATION_BEFORE_ALERT_STATION,
+
+        /** C) 직전역 도달/통과를 뒤늦게 목격 — 폴링 공백·백오프·보정 점프 만회 */
+        AT_OR_PAST_ALERT_STATION,
     }
 }
 
@@ -76,6 +80,19 @@ class EvaluateAlertUseCase @Inject constructor() {
                 alertStation.statnId,
                 AlertEvaluation.Rule.DEPARTED_STATION_BEFORE_ALERT_STATION,
             )
+        }
+
+        // C) 만회 규칙: 폴링 공백·통신 실패 백오프·recptnDt 보정 점프로 A/B 의 "정확한 순간"을
+        // 놓쳤어도, 직전역에 도달했거나 이미 지나친 것으로 목격되면 상태와 무관하게 즉시 발화한다.
+        // 이 규칙이 없으면 그 순간을 한 번 놓칠 경우 목적지를 지나쳐도 영영 울리지 않는다.
+        // 출발역에서는 출발(2) 상태일 때만 인정 — 1정거장 여정에서 탑승 직후(정차 중) 오발화 방지.
+        val currentOrder = graph.station(currentStatnId)!!.order // contains 검사를 위에서 통과함
+        val alertReached = when (direction) {
+            Direction.ASCENDING -> currentOrder >= alertStation.order
+            Direction.DESCENDING -> currentOrder <= alertStation.order
+        }
+        if (alertReached && (currentStatnId != originId || trainStatus == TrainStatus.DEPARTED)) {
+            return AlertEvaluation.Trigger(alertStation.statnId, AlertEvaluation.Rule.AT_OR_PAST_ALERT_STATION)
         }
 
         return AlertEvaluation.NoTrigger

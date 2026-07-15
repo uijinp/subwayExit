@@ -89,13 +89,15 @@ class TrackingStepUseCaseTest {
     }
 
     @Test
-    fun `추적 단계 - 직전역인데 출발 상태면 아직 트리거 아님`() {
+    fun `추적 단계 - 직전역에서 출발 상태로 목격되면 만회 규칙으로 트리거`() {
+        // 직전역에서 이미 출발했다면 다음 정차역이 목적지 — 여기서 안 울리면 기회가 없다(판정 만회 규칙 C).
         val now = 10_000L
         val positions = listOf(position("T1", "C", TrainStatus.DEPARTED, recptnDt = now))
         val input = TrackingStepInput(graph(), trackingSession(now, currentStatnId = "B"), positions, now, polarity)
         val result = useCase(input)
-        assertNull(result.alert)
-        assertEquals(TripState.TRACKING, result.updatedSession.state)
+        assertNotNull(result.alert)
+        assertEquals("C", result.alert!!.alertStationId)
+        assertEquals(TripState.ALERTED, result.updatedSession.state)
         assertEquals("C", result.updatedSession.currentStatnId)
     }
 

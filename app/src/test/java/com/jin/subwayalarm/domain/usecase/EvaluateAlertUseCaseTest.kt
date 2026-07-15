@@ -44,10 +44,46 @@ class EvaluateAlertUseCaseTest {
     }
 
     @Test
-    fun `직전역인데 출발(2) 상태면 아직 트리거 아님`() {
+    fun `직전역에서 출발(2) 상태로 목격되면 만회 규칙(C)으로 트리거`() {
+        // 직전역에서 이미 출발했다면 다음 정차역이 목적지 — 지금 안 울리면 기회가 없다.
         val g = graph()
         val result = useCase(g, originId = "A", destId = "D", currentStatnId = "C", trainStatus = TrainStatus.DEPARTED)
-        assertEquals(AlertEvaluation.NoTrigger, result)
+        assertTrue(result is AlertEvaluation.Trigger)
+        result as AlertEvaluation.Trigger
+        assertEquals(AlertEvaluation.Rule.AT_OR_PAST_ALERT_STATION, result.matchedRule)
+    }
+
+    @Test
+    fun `만회 규칙 - 폴링 공백으로 목적지에서 처음 목격돼도 트리거`() {
+        val g = graph()
+        // 직전역 C 를 못 보고 건너뛰어 목적지 D 에서 처음 목격(백오프·보정 점프 상황).
+        val result = useCase(g, originId = "A", destId = "D", currentStatnId = "D", trainStatus = TrainStatus.ARRIVED)
+        assertTrue(result is AlertEvaluation.Trigger)
+        result as AlertEvaluation.Trigger
+        assertEquals(AlertEvaluation.Rule.AT_OR_PAST_ALERT_STATION, result.matchedRule)
+    }
+
+    @Test
+    fun `만회 규칙 - 목적지를 지나쳐 목격돼도 트리거`() {
+        val g = graph()
+        val result = useCase(g, originId = "A", destId = "D", currentStatnId = "E", trainStatus = TrainStatus.DEPARTED)
+        assertTrue(result is AlertEvaluation.Trigger)
+    }
+
+    @Test
+    fun `만회 규칙 - 역방향 여정도 대칭 동작`() {
+        val g = graph()
+        // origin E → dest B(DESCENDING), 직전역 C 를 건너뛰고 A(목적지 너머)에서 목격.
+        val result = useCase(g, originId = "E", destId = "B", currentStatnId = "A", trainStatus = TrainStatus.ARRIVED)
+        assertTrue(result is AlertEvaluation.Trigger)
+    }
+
+    @Test
+    fun `1정거장 여정 - 출발역에서 출발(2)이면 만회 규칙으로 트리거`() {
+        val g = graph()
+        // origin A → dest B: 직전역 = A(출발역). 출발 상태면 다음 역이 목적지.
+        val result = useCase(g, originId = "A", destId = "B", currentStatnId = "A", trainStatus = TrainStatus.DEPARTED)
+        assertTrue(result is AlertEvaluation.Trigger)
     }
 
     @Test

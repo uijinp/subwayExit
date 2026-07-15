@@ -112,7 +112,13 @@ class TrackingService : LifecycleService() {
                         alarmController.trigger(content, AlarmSetting())
                         break
                     }
-                    delay(PollingIntervalPolicy.intervalSeconds(remaining) * 1000L)
+                    // 탑승 확인 중엔 출발역 정차 창(~30초)을 놓치지 않게 거리와 무관하게 짧은 주기.
+                    val intervalSeconds = if (result.updatedSession.state == TripState.MATCHING) {
+                        PollingIntervalPolicy.MATCHING_INTERVAL_SECONDS
+                    } else {
+                        PollingIntervalPolicy.intervalSeconds(remaining)
+                    }
+                    delay(intervalSeconds * 1000L)
                 }
                 is PositionFetchResult.RateLimited, is PositionFetchResult.Error -> {
                     consecutiveFailures++

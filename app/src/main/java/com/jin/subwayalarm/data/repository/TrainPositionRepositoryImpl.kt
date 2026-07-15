@@ -47,7 +47,10 @@ class TrainPositionRepositoryImpl @Inject constructor(
 
     private companion object {
         const val START_INDEX = 1
-        const val END_INDEX = 100
+
+        // 실측(2026-07-15): 1호선 비혼잡 시간에도 79행(중복 포함) — 러시아워엔 100행을 넘을 수
+        // 있어 100이면 내 열차가 잘려 추적이 얼어붙는다. 500행 요청은 API 가 정상 수용(실측 확인).
+        const val END_INDEX = 500
         const val HTTP_OK = 200
         const val HTTP_TOO_MANY_REQUESTS = 429
         // 실측 확인(작업3): "해당하는 데이터가 없습니다" — 열차 없음(정상 상황), 한도초과 아님.
