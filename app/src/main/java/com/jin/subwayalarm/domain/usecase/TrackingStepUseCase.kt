@@ -112,6 +112,7 @@ class TrackingStepUseCase @Inject constructor(
             direction = direction,
             recptnDtEpochMillis = train.recptnDtEpochMillis,
             nowEpochMillis = input.nowEpochMillis,
+            destId = session.destStatnId,
         )
         val effectiveStatus = if (corrected.stationsAdvanced > 0) TrainStatus.APPROACHING else train.status
         val updatedSession = session.copy(

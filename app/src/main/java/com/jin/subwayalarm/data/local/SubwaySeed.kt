@@ -15,14 +15,23 @@ import com.jin.subwayalarm.domain.model.Station
  *    order 증가 방향(= 노선 끝역 방향)으로 가는 열차의 updnLine 값.
  *  - trainNo 안정성은 7호선에서 75초 간격 시계열로 검증(39/40 유지) — 동일 API 라 타 노선 동일 가정.
  *
- * 보류(추후): 2호선(순환+지선), 1·5·6·9호선(직결/분기/순환/ID불규칙), 8호선(statnId offset 불규칙).
+ * 보류(추후): 2호선(순환+지선), 5·8호선. 1호선은 BRANCHED 전체 수록.
  * ⚠️ avgSecToNext 는 명목값(120s) — "한 역 전 트리거" 목표엔 안전마진으로 흡수(설계 1-2/2-6).
  */
 object SubwaySeed {
 
     data class RawStation(val name: String, val lat: Double, val lon: Double)
 
-    data class LineSeed(val meta: LineMeta, val stations: List<Station>)
+    data class LineSeed(
+        val meta: LineMeta,
+        val stations: List<Station>,
+        /** null = LINEAR(order 인접). non-null = BRANCHED 명시 엣지(statnId 쌍). */
+        val edges: List<Pair<String, String>>? = null,
+    )
+
+    fun edgesFor(lineId: String): List<Pair<String, String>>? =
+        allLines.firstOrNull { it.meta.lineId == lineId }?.edges
+
 
     private const val NOMINAL_SEC = 120
 
@@ -60,13 +69,6 @@ object SubwaySeed {
         )
         return LineSeed(meta, stations)
     }
-
-    /** 1호선 경부 방면 종착 — 경인 시드 매칭에서 제외 (DATA_AUDIT D-4). */
-    val LINE1_GYEONGBU_TERMINI: Set<String> = setOf(
-        "수원", "병점", "서동탄", "세류", "천안", "신창", "광명", "서정리", "평택",
-        "두정", "직산", "성환", "오산", "송탄", "지제", "세마", "당정", "군포",
-        "의왕", "성균관대", "화서", "금정", "안양", "관악", "석수", "금천구청", "독산",
-    )
 
     /** 7호선: 장암(0) → 석남(52). base=709, ascending=updnLine "1"(석남 방향). 실측 44건+시계열 검증. */
     val line7: LineSeed = buildLine(
@@ -299,62 +301,235 @@ object SubwaySeed {
     )
 
     /**
-     * 1호선(경인선 구간): 청량리(0) → 인천(37). base=124, ascending=updnLine "1"(인천 방향).
-     * 수집기 시계열 인접관계 + statnId 연속(인천 161 → 청량리 124) 실측으로 순서 검증(34/38 전수 일치).
-     *
-     * ⚠️ "1호선"은 실제로 구로에서 경부선(수원·천안)과 갈라지는 분기망이지만, 실시간 API 가
-     * 전 구간을 subwayId "1001"로 반환하므로 노선 매칭상 lineId="1001" 항목은 하나만 둘 수 있다.
-     * 사용자 요청(인천·부평 ↔ 서울역·청량리)에 맞춰 경인 구간만 수록. 경부/경원 구간은 미포함.
-     * 트렁크역(구로~청량리)은 경부 열차와 공유되므로 그 구간에서 "탑승"하면 매칭이 모호할 수 있음
-     * (인천·부평 등 경인 전용역에서 타면 정상). 탑승 확정 후 추적은 boardedTrainNo 기준이라 정상.
+     * 1호선 전체: 연천–인천 본선 + 구로 분기 경부·장항(신창) + 광명·서동탄 지선.
+     * topology=BRANCHED. API lineName="1호선", updnLine "1" ≈ order 증가(남쪽 방면).
+     * statnId 는 realtimePosition/arrival 실측 매핑 (경부는 1001080xxx 계열).
      */
-    val line1Gyeongin: LineSeed = buildLine(
-        "1001", "1호선", "1", 124,
-        displayName = "1호선 (경인 청량리–인천)",
-        excludedTerminusNames = LINE1_GYEONGBU_TERMINI,
-        raws = listOf(
-            RawStation("청량리(서울시립대입구)", 37.579956, 127.044585),
-            RawStation("제기동", 37.578103, 127.034893),
-            RawStation("신설동", 37.576048, 127.024634),
-            RawStation("동묘앞", 37.573197, 127.01648),
-            RawStation("동대문", 37.571687, 127.01093),
-            RawStation("종로5가", 37.570926, 127.001849),
-            RawStation("종로3가", 37.570406, 126.991847),
-            RawStation("종각", 37.570161, 126.982923),
-            RawStation("시청", 37.565715, 126.977088),
-            RawStation("서울역", 37.556228, 126.972135),
-            RawStation("남영", 37.541021, 126.9713),
-            RawStation("용산", 37.529849, 126.964561),
-            RawStation("노량진", 37.514149, 126.94271),
-            RawStation("대방", 37.513342, 126.926382),
-            RawStation("신길", 37.516862, 126.917865),
-            RawStation("영등포", 37.515504, 126.907628),
-            RawStation("신도림", 37.508961, 126.891084),
-            RawStation("구로", 37.503039, 126.881966),
-            RawStation("구일", 37.496756, 126.870793),
-            RawStation("개봉", 37.494594, 126.85968),
-            RawStation("오류동", 37.494526, 126.845365),
-            RawStation("온수(성공회대입구)", 37.492433, 126.824086),
-            RawStation("역곡", 37.485178, 126.811502),
-            RawStation("소사", 37.482753, 126.79544),
-            RawStation("부천", 37.48405, 126.782686),
-            RawStation("중동", 37.486562, 126.764843),
-            RawStation("송내", 37.4876, 126.753664),
-            RawStation("부개", 37.488418, 126.74109),
-            RawStation("부평", 37.489445, 126.724506),
-            RawStation("백운", 37.483664, 126.707704),
-            RawStation("동암", 37.471408, 126.702896),
-            RawStation("간석", 37.464737, 126.694181),
-            RawStation("주안", 37.465047, 126.679742),
-            RawStation("도화", 37.46607, 126.668672),
-            RawStation("제물포", 37.466769, 126.656666),
-            RawStation("도원", 37.468446, 126.642706),
-            RawStation("동인천", 37.475276, 126.632802),
-            RawStation("인천", 37.476079, 126.616801),
-        ),
+    // 1호선 전체(연천–인천 본선 + 경부·장항 + 광명·서동탄 지선). BRANCHED.
+    // statnId 는 realtimePosition/arrival 실측 매핑.
+    private val line1Stations: List<Station> = listOf(
+        Station(statnId = "1001001003", lineId = "1001", name = "연천", order = 0, avgSecToNext = 120, lat = 38.10073, lon = 127.07372),
+        Station(statnId = "1001001001", lineId = "1001", name = "청산", order = 1, avgSecToNext = 120, lat = 37.98172, lon = 127.06912),
+        Station(statnId = "1001001002", lineId = "1001", name = "전곡", order = 2, avgSecToNext = 120, lat = 38.02458, lon = 127.0718),
+        Station(statnId = "1001000100", lineId = "1001", name = "소요산", order = 3, avgSecToNext = 120, lat = 37.9481, lon = 127.061034),
+        Station(statnId = "1001000101", lineId = "1001", name = "동두천", order = 4, avgSecToNext = 120, lat = 37.927878, lon = 127.05479),
+        Station(statnId = "1001000102", lineId = "1001", name = "보산", order = 5, avgSecToNext = 120, lat = 37.913702, lon = 127.057277),
+        Station(statnId = "1001000103", lineId = "1001", name = "동두천중앙", order = 6, avgSecToNext = 120, lat = 37.901885, lon = 127.056482),
+        Station(statnId = "1001000104", lineId = "1001", name = "지행", order = 7, avgSecToNext = 120, lat = 37.892334, lon = 127.055716),
+        Station(statnId = "1001000105", lineId = "1001", name = "덕정", order = 8, avgSecToNext = 120, lat = 37.843188, lon = 127.061277),
+        Station(statnId = "1001000106", lineId = "1001", name = "덕계", order = 9, avgSecToNext = 120, lat = 37.818486, lon = 127.056486),
+        Station(statnId = "1001000107", lineId = "1001", name = "양주", order = 10, avgSecToNext = 120, lat = 37.774381, lon = 127.044708),
+        Station(statnId = "1001000108", lineId = "1001", name = "녹양", order = 11, avgSecToNext = 120, lat = 37.75938, lon = 127.042292),
+        Station(statnId = "1001000109", lineId = "1001", name = "가능", order = 12, avgSecToNext = 120, lat = 37.748577, lon = 127.044213),
+        Station(statnId = "1001000110", lineId = "1001", name = "의정부", order = 13, avgSecToNext = 120, lat = 37.738415, lon = 127.045958),
+        Station(statnId = "1001000111", lineId = "1001", name = "회룡", order = 14, avgSecToNext = 120, lat = 37.725006, lon = 127.047073),
+        Station(statnId = "1001000112", lineId = "1001", name = "망월사", order = 15, avgSecToNext = 120, lat = 37.709914, lon = 127.047455),
+        Station(statnId = "1001000113", lineId = "1001", name = "도봉산", order = 16, avgSecToNext = 120, lat = 37.689241, lon = 127.046509),
+        Station(statnId = "1001000114", lineId = "1001", name = "도봉", order = 17, avgSecToNext = 120, lat = 37.679563, lon = 127.045595),
+        Station(statnId = "1001000115", lineId = "1001", name = "방학", order = 18, avgSecToNext = 120, lat = 37.667503, lon = 127.044273),
+        Station(statnId = "1001000116", lineId = "1001", name = "창동", order = 19, avgSecToNext = 120, lat = 37.653088, lon = 127.047274),
+        Station(statnId = "1001000117", lineId = "1001", name = "녹천", order = 20, avgSecToNext = 120, lat = 37.644799, lon = 127.051269),
+        Station(statnId = "1001000118", lineId = "1001", name = "월계", order = 21, avgSecToNext = 120, lat = 37.633212, lon = 127.058831),
+        Station(statnId = "1001000119", lineId = "1001", name = "광운대", order = 22, avgSecToNext = 120, lat = 37.623632, lon = 127.061835),
+        Station(statnId = "1001000120", lineId = "1001", name = "석계", order = 23, avgSecToNext = 120, lat = 37.614872, lon = 127.065595),
+        Station(statnId = "1001000121", lineId = "1001", name = "신이문", order = 24, avgSecToNext = 120, lat = 37.601854, lon = 127.067325),
+        Station(statnId = "1001000122", lineId = "1001", name = "외대앞", order = 25, avgSecToNext = 120, lat = 37.596073, lon = 127.063549),
+        Station(statnId = "1001000123", lineId = "1001", name = "회기", order = 26, avgSecToNext = 120, lat = 37.58946, lon = 127.057583),
+        Station(statnId = "1001000124", lineId = "1001", name = "청량리(서울시립대입구)", order = 27, avgSecToNext = 120, lat = 37.580759, lon = 127.0483),
+        Station(statnId = "1001000125", lineId = "1001", name = "제기동", order = 28, avgSecToNext = 120, lat = 37.578103, lon = 127.034893),
+        Station(statnId = "1001000126", lineId = "1001", name = "신설동", order = 29, avgSecToNext = 120, lat = 37.576095, lon = 127.023242),
+        Station(statnId = "1001000127", lineId = "1001", name = "동묘앞", order = 30, avgSecToNext = 120, lat = 37.572279, lon = 127.015653),
+        Station(statnId = "1001000128", lineId = "1001", name = "동대문", order = 31, avgSecToNext = 120, lat = 37.57093, lon = 127.009287),
+        Station(statnId = "1001000129", lineId = "1001", name = "종로5가", order = 32, avgSecToNext = 120, lat = 37.570926, lon = 127.001849),
+        Station(statnId = "1001000130", lineId = "1001", name = "종로3가", order = 33, avgSecToNext = 120, lat = 37.57254, lon = 126.990305),
+        Station(statnId = "1001000131", lineId = "1001", name = "종각", order = 34, avgSecToNext = 120, lat = 37.570161, lon = 126.982923),
+        Station(statnId = "1001000132", lineId = "1001", name = "시청", order = 35, avgSecToNext = 120, lat = 37.563588, lon = 126.975411),
+        Station(statnId = "1001000133", lineId = "1001", name = "서울역", order = 36, avgSecToNext = 120, lat = 37.553247, lon = 126.969769),
+        Station(statnId = "1001000134", lineId = "1001", name = "남영", order = 37, avgSecToNext = 120, lat = 37.541021, lon = 126.9713),
+        Station(statnId = "1001000135", lineId = "1001", name = "용산", order = 38, avgSecToNext = 120, lat = 37.529849, lon = 126.964561),
+        Station(statnId = "1001000136", lineId = "1001", name = "노량진", order = 39, avgSecToNext = 120, lat = 37.513534, lon = 126.941005),
+        Station(statnId = "1001000137", lineId = "1001", name = "대방", order = 40, avgSecToNext = 120, lat = 37.5133059, lon = 126.9257265),
+        Station(statnId = "1001000138", lineId = "1001", name = "신길", order = 41, avgSecToNext = 120, lat = 37.517623, lon = 126.914839),
+        Station(statnId = "1001000139", lineId = "1001", name = "영등포", order = 42, avgSecToNext = 120, lat = 37.515504, lon = 126.907628),
+        Station(statnId = "1001000140", lineId = "1001", name = "신도림", order = 43, avgSecToNext = 120, lat = 37.508787, lon = 126.891144),
+        Station(statnId = "1001000141", lineId = "1001", name = "구로", order = 44, avgSecToNext = 120, lat = 37.503039, lon = 126.881966),
+        Station(statnId = "1001000142", lineId = "1001", name = "구일", order = 45, avgSecToNext = 120, lat = 37.496756, lon = 126.870793),
+        Station(statnId = "1001000143", lineId = "1001", name = "개봉", order = 46, avgSecToNext = 120, lat = 37.494594, lon = 126.85968),
+        Station(statnId = "1001000144", lineId = "1001", name = "오류동", order = 47, avgSecToNext = 120, lat = 37.494526, lon = 126.845365),
+        Station(statnId = "1001000145", lineId = "1001", name = "온수(성공회대입구)", order = 48, avgSecToNext = 120, lat = 37.492092, lon = 126.823023),
+        Station(statnId = "1001000146", lineId = "1001", name = "역곡", order = 49, avgSecToNext = 120, lat = 37.485178, lon = 126.811502),
+        Station(statnId = "1001000147", lineId = "1001", name = "소사", order = 50, avgSecToNext = 120, lat = 37.483279, lon = 126.795023),
+        Station(statnId = "1001000148", lineId = "1001", name = "부천", order = 51, avgSecToNext = 120, lat = 37.48405, lon = 126.782686),
+        Station(statnId = "1001000149", lineId = "1001", name = "중동", order = 52, avgSecToNext = 120, lat = 37.486562, lon = 126.764843),
+        Station(statnId = "1001000150", lineId = "1001", name = "송내", order = 53, avgSecToNext = 120, lat = 37.4876, lon = 126.753664),
+        Station(statnId = "1001000151", lineId = "1001", name = "부개", order = 54, avgSecToNext = 120, lat = 37.488418, lon = 126.74109),
+        Station(statnId = "1001000152", lineId = "1001", name = "부평", order = 55, avgSecToNext = 120, lat = 37.490535, lon = 126.723453),
+        Station(statnId = "1001000153", lineId = "1001", name = "백운", order = 56, avgSecToNext = 120, lat = 37.483664, lon = 126.707704),
+        Station(statnId = "1001000154", lineId = "1001", name = "동암", order = 57, avgSecToNext = 120, lat = 37.471408, lon = 126.702896),
+        Station(statnId = "1001000155", lineId = "1001", name = "간석", order = 58, avgSecToNext = 120, lat = 37.464737, lon = 126.694181),
+        Station(statnId = "1001000156", lineId = "1001", name = "주안", order = 59, avgSecToNext = 120, lat = 37.464992, lon = 126.679098),
+        Station(statnId = "1001000157", lineId = "1001", name = "도화", order = 60, avgSecToNext = 120, lat = 37.46607, lon = 126.668672),
+        Station(statnId = "1001000158", lineId = "1001", name = "제물포", order = 61, avgSecToNext = 120, lat = 37.466769, lon = 126.656666),
+        Station(statnId = "1001000159", lineId = "1001", name = "도원", order = 62, avgSecToNext = 120, lat = 37.468446, lon = 126.642706),
+        Station(statnId = "1001000160", lineId = "1001", name = "동인천", order = 63, avgSecToNext = 120, lat = 37.475276, lon = 126.632802),
+        Station(statnId = "1001000161", lineId = "1001", name = "인천", order = 64, avgSecToNext = 120, lat = 37.476403, lon = 126.617326),
+        Station(statnId = "1001080142", lineId = "1001", name = "가산디지털단지", order = 1001, avgSecToNext = 120, lat = 37.480338, lon = 126.882656),
+        Station(statnId = "1001080143", lineId = "1001", name = "독산", order = 1002, avgSecToNext = 120, lat = 37.466613, lon = 126.889249),
+        Station(statnId = "1001080144", lineId = "1001", name = "금천구청", order = 1003, avgSecToNext = 120, lat = 37.455626, lon = 126.89398),
+        Station(statnId = "1001080145", lineId = "1001", name = "석수", order = 1004, avgSecToNext = 120, lat = 37.435047, lon = 126.902295),
+        Station(statnId = "1001080146", lineId = "1001", name = "관악", order = 1005, avgSecToNext = 120, lat = 37.419232, lon = 126.908706),
+        Station(statnId = "1001080147", lineId = "1001", name = "안양", order = 1006, avgSecToNext = 120, lat = 37.401592, lon = 126.922874),
+        Station(statnId = "1001080148", lineId = "1001", name = "명학", order = 1007, avgSecToNext = 120, lat = 37.384653, lon = 126.935433),
+        Station(statnId = "1001080149", lineId = "1001", name = "금정", order = 1008, avgSecToNext = 120, lat = 37.372221, lon = 126.943429),
+        Station(statnId = "1001080150", lineId = "1001", name = "군포", order = 1009, avgSecToNext = 120, lat = 37.35356, lon = 126.948462),
+        Station(statnId = "1001080151", lineId = "1001", name = "당정", order = 1010, avgSecToNext = 120, lat = 37.344285, lon = 126.948345),
+        Station(statnId = "1001080152", lineId = "1001", name = "의왕", order = 1011, avgSecToNext = 120, lat = 37.320852, lon = 126.948217),
+        Station(statnId = "1001080153", lineId = "1001", name = "성균관대", order = 1012, avgSecToNext = 120, lat = 37.300349, lon = 126.97075),
+        Station(statnId = "1001080154", lineId = "1001", name = "화서", order = 1013, avgSecToNext = 120, lat = 37.283862, lon = 126.989627),
+        Station(statnId = "1001080155", lineId = "1001", name = "수원", order = 1014, avgSecToNext = 120, lat = 37.265917, lon = 126.999422),
+        Station(statnId = "1001080156", lineId = "1001", name = "세류", order = 1015, avgSecToNext = 120, lat = 37.245025, lon = 127.013222),
+        Station(statnId = "1001080157", lineId = "1001", name = "병점", order = 1016, avgSecToNext = 120, lat = 37.207503, lon = 127.032731),
+        Station(statnId = "1001080158", lineId = "1001", name = "세마", order = 1017, avgSecToNext = 120, lat = 37.187533, lon = 127.04318),
+        Station(statnId = "1001080159", lineId = "1001", name = "오산대", order = 1018, avgSecToNext = 120, lat = 37.168953, lon = 127.063197),
+        Station(statnId = "1001080160", lineId = "1001", name = "오산", order = 1019, avgSecToNext = 120, lat = 37.145885, lon = 127.06672),
+        Station(statnId = "1001080161", lineId = "1001", name = "진위", order = 1020, avgSecToNext = 120, lat = 37.109447, lon = 127.062278),
+        Station(statnId = "1001080162", lineId = "1001", name = "송탄", order = 1021, avgSecToNext = 120, lat = 37.075696, lon = 127.054301),
+        Station(statnId = "1001080163", lineId = "1001", name = "서정리", order = 1022, avgSecToNext = 120, lat = 37.056496, lon = 127.052819),
+        Station(statnId = "1001080164", lineId = "1001", name = "지제", order = 1023, avgSecToNext = 120, lat = 37.0188, lon = 127.070444),
+        Station(statnId = "1001080165", lineId = "1001", name = "평택", order = 1024, avgSecToNext = 120, lat = 36.990726, lon = 127.085159),
+        Station(statnId = "1001080166", lineId = "1001", name = "성환", order = 1025, avgSecToNext = 120, lat = 36.916076, lon = 127.126964),
+        Station(statnId = "1001080167", lineId = "1001", name = "직산", order = 1026, avgSecToNext = 120, lat = 36.870593, lon = 127.143904),
+        Station(statnId = "1001080168", lineId = "1001", name = "두정", order = 1027, avgSecToNext = 120, lat = 36.833705, lon = 127.14896),
+        Station(statnId = "1001080169", lineId = "1001", name = "천안", order = 1028, avgSecToNext = 120, lat = 36.810005, lon = 127.146826),
+        Station(statnId = "1001080170", lineId = "1001", name = "봉명", order = 1029, avgSecToNext = 120, lat = 36.801215, lon = 127.135763),
+        Station(statnId = "1001080171", lineId = "1001", name = "쌍용(나사렛대)", order = 1030, avgSecToNext = 120, lat = 36.793759, lon = 127.1214),
+        Station(statnId = "1001080172", lineId = "1001", name = "아산", order = 1031, avgSecToNext = 120, lat = 36.792053, lon = 127.104361),
+        Station(statnId = "1001080173", lineId = "1001", name = "탕정", order = 1032, avgSecToNext = 120, lat = 36.78866, lon = 127.08485),
+        Station(statnId = "1001080174", lineId = "1001", name = "배방", order = 1033, avgSecToNext = 120, lat = 36.777629, lon = 127.052991),
+        Station(statnId = "1001080175", lineId = "1001", name = "온양온천", order = 1034, avgSecToNext = 120, lat = 36.780483, lon = 127.003249),
+        Station(statnId = "1001080176", lineId = "1001", name = "신창", order = 1035, avgSecToNext = 120, lat = 36.769502, lon = 126.951108),
+        Station(statnId = "1001080750", lineId = "1001", name = "광명", order = 2000, avgSecToNext = 120, lat = 37.416182, lon = 126.884466),
+        Station(statnId = "1001801571", lineId = "1001", name = "서동탄", order = 2001, avgSecToNext = 120, lat = 37.195504, lon = 127.051672),
+    )
+    // edges 101
+    private val line1Edges: List<Pair<String, String>> = listOf(
+        "1001001003" to "1001001001",
+        "1001001001" to "1001001002",
+        "1001001002" to "1001000100",
+        "1001000100" to "1001000101",
+        "1001000101" to "1001000102",
+        "1001000102" to "1001000103",
+        "1001000103" to "1001000104",
+        "1001000104" to "1001000105",
+        "1001000105" to "1001000106",
+        "1001000106" to "1001000107",
+        "1001000107" to "1001000108",
+        "1001000108" to "1001000109",
+        "1001000109" to "1001000110",
+        "1001000110" to "1001000111",
+        "1001000111" to "1001000112",
+        "1001000112" to "1001000113",
+        "1001000113" to "1001000114",
+        "1001000114" to "1001000115",
+        "1001000115" to "1001000116",
+        "1001000116" to "1001000117",
+        "1001000117" to "1001000118",
+        "1001000118" to "1001000119",
+        "1001000119" to "1001000120",
+        "1001000120" to "1001000121",
+        "1001000121" to "1001000122",
+        "1001000122" to "1001000123",
+        "1001000123" to "1001000124",
+        "1001000124" to "1001000125",
+        "1001000125" to "1001000126",
+        "1001000126" to "1001000127",
+        "1001000127" to "1001000128",
+        "1001000128" to "1001000129",
+        "1001000129" to "1001000130",
+        "1001000130" to "1001000131",
+        "1001000131" to "1001000132",
+        "1001000132" to "1001000133",
+        "1001000133" to "1001000134",
+        "1001000134" to "1001000135",
+        "1001000135" to "1001000136",
+        "1001000136" to "1001000137",
+        "1001000137" to "1001000138",
+        "1001000138" to "1001000139",
+        "1001000139" to "1001000140",
+        "1001000140" to "1001000141",
+        "1001000141" to "1001000142",
+        "1001000142" to "1001000143",
+        "1001000143" to "1001000144",
+        "1001000144" to "1001000145",
+        "1001000145" to "1001000146",
+        "1001000146" to "1001000147",
+        "1001000147" to "1001000148",
+        "1001000148" to "1001000149",
+        "1001000149" to "1001000150",
+        "1001000150" to "1001000151",
+        "1001000151" to "1001000152",
+        "1001000152" to "1001000153",
+        "1001000153" to "1001000154",
+        "1001000154" to "1001000155",
+        "1001000155" to "1001000156",
+        "1001000156" to "1001000157",
+        "1001000157" to "1001000158",
+        "1001000158" to "1001000159",
+        "1001000159" to "1001000160",
+        "1001000160" to "1001000161",
+        "1001000141" to "1001080142",
+        "1001080142" to "1001080143",
+        "1001080143" to "1001080144",
+        "1001080144" to "1001080145",
+        "1001080145" to "1001080146",
+        "1001080146" to "1001080147",
+        "1001080147" to "1001080148",
+        "1001080148" to "1001080149",
+        "1001080149" to "1001080150",
+        "1001080150" to "1001080151",
+        "1001080151" to "1001080152",
+        "1001080152" to "1001080153",
+        "1001080153" to "1001080154",
+        "1001080154" to "1001080155",
+        "1001080155" to "1001080156",
+        "1001080156" to "1001080157",
+        "1001080157" to "1001080158",
+        "1001080158" to "1001080159",
+        "1001080159" to "1001080160",
+        "1001080160" to "1001080161",
+        "1001080161" to "1001080162",
+        "1001080162" to "1001080163",
+        "1001080163" to "1001080164",
+        "1001080164" to "1001080165",
+        "1001080165" to "1001080166",
+        "1001080166" to "1001080167",
+        "1001080167" to "1001080168",
+        "1001080168" to "1001080169",
+        "1001080169" to "1001080170",
+        "1001080170" to "1001080171",
+        "1001080171" to "1001080172",
+        "1001080172" to "1001080173",
+        "1001080173" to "1001080174",
+        "1001080174" to "1001080175",
+        "1001080175" to "1001080176",
+        "1001080144" to "1001080750",
+        "1001080157" to "1001801571",
     )
 
-    val allLines: List<LineSeed> = listOf(line1Gyeongin, line3, line4, line6, line7, line9)
+    val line1: LineSeed = LineSeed(
+        meta = LineMeta(
+            lineId = "1001",
+            lineName = "1호선",
+            supportsRealtime = true,
+            topology = LineTopology.BRANCHED,
+            directionPolarity = DirectionPolarity("1"),
+            displayName = "1호선 (연천–인천·경부)",
+        ),
+        stations = line1Stations,
+        edges = line1Edges,
+    )
+
+    val allLines: List<LineSeed> = listOf(line1, line3, line4, line6, line7, line9)
 
     // --- 하위호환(기존 테스트·StationRepositoryImpl 참조) ---
     const val LINE_7_ID = "1007"

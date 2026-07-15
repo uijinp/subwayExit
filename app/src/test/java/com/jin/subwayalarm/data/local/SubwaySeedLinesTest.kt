@@ -12,7 +12,7 @@ class SubwaySeedLinesTest {
     @Test
     fun `모든 노선이 유효한 그래프를 구성하고 좌표·극성을 가진다`() {
         SubwaySeed.allLines.forEach { seed ->
-            val g = StationGraph(seed.stations) // 중복 statnId·order 면 여기서 예외
+            val g = StationGraph(seed.stations, seed.edges) // 중복 statnId·order 면 여기서 예외
             assertTrue("${seed.meta.lineName} 역 없음", g.size > 0)
             assertNotNull("${seed.meta.lineName} 극성 미설정", seed.meta.directionPolarity)
             seed.stations.forEach {
@@ -65,23 +65,35 @@ class SubwaySeedLinesTest {
     }
 
     @Test
-    fun `1호선(경인)은 청량리-인천 38역, statnId 는 base 124`() {
-        val g = StationGraph(SubwaySeed.line1Gyeongin.stations)
-        assertEquals(38, g.size)
-        assertEquals("청량리(서울시립대입구)", g.stations.first().name)
-        assertEquals("인천", g.stations.last().name)
-        assertEquals("1001000124", g.stations.first().statnId)
-        assertEquals("1001000161", g.stations.last().statnId) // 인천 실측 statnId
+    fun `1호선은 연천-인천-경부 포함 100역 이상 BRANCHED`() {
+        val seed = SubwaySeed.line1
+        assertTrue(seed.stations.size >= 100)
+        assertEquals(com.jin.subwayalarm.domain.model.LineTopology.BRANCHED, seed.meta.topology)
+        assertNotNull(seed.edges)
+        val g = StationGraph(seed.stations, seed.edges)
+        val names = seed.stations.map { it.name }.toSet()
+        assertTrue(names.contains("연천"))
+        assertTrue(names.contains("인천"))
+        assertTrue(names.contains("수원"))
+        assertTrue(names.contains("신창"))
+        assertTrue(names.contains("광명") || names.any { it.contains("광명") })
+        assertTrue(names.contains("서동탄"))
+        // 구로 분기로 경인·경부 둘 다 도달
+        assertTrue(g.path(
+            seed.stations.first { it.name == "연천" }.statnId,
+            seed.stations.first { it.name == "인천" }.statnId,
+        ) != null)
+        assertTrue(g.path(
+            seed.stations.first { it.name.contains("청량리") }.statnId,
+            seed.stations.first { it.name == "수원" }.statnId,
+        ) != null)
+        assertEquals("1001000161", seed.stations.first { it.name == "인천" }.statnId)
     }
 
     @Test
-    fun `1호선 표시명은 경인 구간 고지, 경부 종착 필터가 있다`() {
-        val meta = SubwaySeed.line1Gyeongin.meta
-        assertTrue(meta.displayName.contains("경인"))
-        assertTrue(meta.excludedTerminusNames.contains("수원"))
-        val names = SubwaySeed.line1Gyeongin.stations.map { it.name }.toSet()
-        assertFalse(names.contains("수원"))
-        assertFalse(names.contains("회기"))
+    fun `1호선 표시명에 경부 범위 고지`() {
+        assertTrue(SubwaySeed.line1.meta.displayName.contains("경부") ||
+            SubwaySeed.line1.meta.displayName.contains("인천"))
     }
 
     @Test

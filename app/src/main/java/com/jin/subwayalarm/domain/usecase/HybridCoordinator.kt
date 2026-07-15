@@ -17,6 +17,8 @@ data class HybridInput(
     /** null = 이번 틱 API 에서 열차 소실 */
     val apiCorrectedStatnId: String?,
     val accelStopCountSinceResync: Int,
+    /** 가속도 전진 방향(목적지). null 이면 direction 만 사용. */
+    val destStatnId: String? = null,
 )
 
 data class HybridResult(
@@ -45,8 +47,10 @@ object HybridCoordinator {
 
         var current = input.lastKnownStatnId
         var advanced = 0
+        // dest 쪽으로만 전진 — 분기 노선에서 order±1 오판 방지
+        val destId = input.destStatnId
         repeat(input.accelStopCountSinceResync.coerceAtLeast(0)) {
-            val next = input.graph.nextStation(current, input.direction) ?: return@repeat
+            val next = input.graph.nextStation(current, input.direction, destId = destId) ?: return@repeat
             current = next.statnId
             advanced++
         }

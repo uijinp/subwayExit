@@ -151,6 +151,7 @@ class TrackingService : LifecycleService() {
                             direction = direction,
                             recptnDtEpochMillis = train.recptnDtEpochMillis,
                             nowEpochMillis = now,
+                            destId = session.destStatnId,
                         ).statnId
                     } else {
                         null
@@ -164,6 +165,7 @@ class TrackingService : LifecycleService() {
                                 lastKnownStatnId = session.currentStatnId,
                                 apiCorrectedStatnId = apiCorrectedId,
                                 accelStopCountSinceResync = accelCounter.stopCount,
+                                destStatnId = session.destStatnId,
                             ),
                         )
                     } else {
@@ -235,6 +237,7 @@ class TrackingService : LifecycleService() {
                                     lastKnownStatnId = sessionNow.currentStatnId,
                                     apiCorrectedStatnId = null,
                                     accelStopCountSinceResync = accelCounter.stopCount,
+                                    destStatnId = sessionNow.destStatnId,
                                 ),
                             )
                             val result = trackingStep(

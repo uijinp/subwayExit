@@ -11,7 +11,10 @@ class SubwayNetworkTest {
     private fun realNetwork(): SubwayNetwork {
         val perLine = SubwaySeed.allLines.associate { it.meta.lineId to it.stations }
         val metas = SubwaySeed.allLines.map { it.meta }
-        return SubwayNetwork(perLine, metas)
+        val edges = SubwaySeed.allLines.mapNotNull { seed ->
+            seed.edges?.let { seed.meta.lineId to it }
+        }.toMap()
+        return SubwayNetwork(perLine, metas, perLineEdges = edges)
     }
 
     @Test

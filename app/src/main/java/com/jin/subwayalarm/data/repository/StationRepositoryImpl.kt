@@ -19,9 +19,11 @@ class StationRepositoryImpl @Inject constructor(
 ) : StationRepository {
 
     override suspend fun ensureSeeded() {
-        // 노선별 개별 시드(누락된 노선만) — 시드 목록이 늘어도 재설치 없이 반영됨.
+        // 역 개수가 시드와 다르면 해당 노선 재적재 (1호선 확장 등 반영).
         SubwaySeed.allLines.forEach { seed ->
-            if (stationDao.countForLine(seed.meta.lineId) == 0) {
+            val count = stationDao.countForLine(seed.meta.lineId)
+            if (count != seed.stations.size) {
+                stationDao.clearLine(seed.meta.lineId)
                 lineMetaDao.upsertAll(listOf(seed.meta.toEntity()))
                 stationDao.upsertAll(seed.stations.map { it.toEntity() })
             }
@@ -36,12 +38,15 @@ class StationRepositoryImpl @Inject constructor(
 
     override suspend fun stationGraph(lineId: String): StationGraph? {
         val stations = stations(lineId)
-        return if (stations.isEmpty()) null else StationGraph(stations)
+        if (stations.isEmpty()) return null
+        return StationGraph(stations, SubwaySeed.edgesFor(lineId))
     }
 
     override suspend fun buildNetwork(): SubwayNetwork {
         val metas = lineMetas()
         val perLine = metas.associate { it.lineId to stations(it.lineId) }
-        return SubwayNetwork(perLine, metas)
+        val edges = metas.associate { it.lineId to (SubwaySeed.edgesFor(it.lineId) ?: emptyList()) }
+            .filterValues { it.isNotEmpty() }
+        return SubwayNetwork(perLine, metas, perLineEdges = edges)
     }
 }

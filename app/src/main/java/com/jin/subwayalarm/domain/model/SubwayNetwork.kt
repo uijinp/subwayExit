@@ -13,6 +13,7 @@ class SubwayNetwork(
     perLineStations: Map<String, List<Station>>,
     lineMetas: List<LineMeta>,
     walkTransfers: Map<String, Set<String>> = WalkTransfers.aliasesOf,
+    perLineEdges: Map<String, List<Pair<String, String>>> = emptyMap(),
 ) {
 
     private val lineNameById: Map<String, String> = lineMetas.associate { it.lineId to it.lineName }
@@ -20,7 +21,10 @@ class SubwayNetwork(
         lineMetas.associate { it.lineId to (it.displayName.ifBlank { it.lineName }) }
     private val graphs: Map<String, StationGraph> = perLineStations
         .filterValues { it.isNotEmpty() }
-        .mapValues { (_, stations) -> StationGraph(stations) }
+        .mapValues { (lineId, stations) ->
+            val edges = perLineEdges[lineId]?.takeIf { it.isNotEmpty() }
+            StationGraph(stations, edges)
+        }
 
     /** 역명 → 그 역을 지나는 노선ID 집합. */
     private val linesByName: Map<String, Set<String>> = buildMap<String, MutableSet<String>> {
@@ -50,10 +54,9 @@ class SubwayNetwork(
         val graph = graphs[lineId] ?: return emptyList()
         val station = stationOn(lineId, stationName) ?: return emptyList()
 
-        val sameLine = listOfNotNull(
-            graph.nextStation(station.statnId, Direction.ASCENDING),
-            graph.nextStation(station.statnId, Direction.DESCENDING),
-        ).map { NetworkEdge(it.name, lineId, isTransfer = false) }
+        // 분기 노선은 order±1 이 아니라 인접 전체(구로→구일·가산 등)
+        val sameLine = graph.adjacent(station.statnId)
+            .map { NetworkEdge(it.name, lineId, isTransfer = false) }
 
         val sameNameTransfers = linesServing(stationName)
             .filter { it != lineId }
