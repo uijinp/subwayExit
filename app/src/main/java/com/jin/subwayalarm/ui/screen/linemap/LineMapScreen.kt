@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jin.subwayalarm.domain.model.Direction
-import com.jin.subwayalarm.domain.model.TrainStatus
 import com.jin.subwayalarm.domain.usecase.LineBoardRow
 import com.jin.subwayalarm.domain.usecase.LineTrainMarker
 import com.jin.subwayalarm.ui.theme.DawatColors
@@ -137,11 +136,21 @@ private fun StatusLine(uiState: LineMapViewModel.UiState) {
 private fun BoardStationRow(row: LineBoardRow, isFirst: Boolean, isLast: Boolean) {
     val hasTrain = row.trains.isNotEmpty()
     Row(
-        modifier = Modifier.fillMaxWidth().height(44.dp),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RailMarker(isFirst = isFirst, isLast = isLast, hasTrain = hasTrain, modifier = Modifier.width(30.dp).fillMaxHeight())
-        Spacer(modifier = Modifier.width(8.dp))
+        // 레일 + 레일 위 기차 아이콘
+        Box(modifier = Modifier.width(44.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            RailMarker(isFirst = isFirst, isLast = isLast, hasTrain = hasTrain, modifier = Modifier.fillMaxSize())
+            if (hasTrain) {
+                Text("🚈", fontSize = 20.sp)
+            }
+        }
+        // 열차번호 배지(방향·급행 색)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            row.trains.forEach { TrainNumberBadge(it) }
+        }
+        if (hasTrain) Spacer(modifier = Modifier.width(8.dp)) else Spacer(modifier = Modifier.width(4.dp))
         Text(
             row.station.name,
             style = MaterialTheme.typography.bodyMedium,
@@ -149,24 +158,15 @@ private fun BoardStationRow(row: LineBoardRow, isFirst: Boolean, isLast: Boolean
             color = if (hasTrain) DawatColors.TextPrimary else DawatColors.TextMuted,
             modifier = Modifier.weight(1f),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            row.trains.forEach { TrainChip(it) }
-        }
     }
 }
 
 @Composable
-private fun TrainChip(train: LineTrainMarker) {
+private fun TrainNumberBadge(train: LineTrainMarker) {
     val arrow = when (train.direction) {
         Direction.ASCENDING -> "▼"
         Direction.DESCENDING -> "▲"
-        null -> "·"
-    }
-    val statusText = when (train.status) {
-        TrainStatus.APPROACHING -> "진입"
-        TrainStatus.ARRIVED -> "도착"
-        TrainStatus.DEPARTED -> "출발"
-        TrainStatus.DEPARTED_PREVIOUS_STATION -> "접근"
+        null -> ""
     }
     val bg = when {
         train.isExpress -> DawatColors.Coral
@@ -174,13 +174,13 @@ private fun TrainChip(train: LineTrainMarker) {
         else -> DawatColors.Green
     }
     Box(
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(bg).padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(bg).padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
         Text(
             text = buildString {
                 append(arrow)
-                if (train.isExpress) append(" 급행")
-                append(" $statusText")
+                append(train.trainNo)
+                if (train.isExpress) append(" 급")
             },
             color = DawatColors.OnDark,
             fontSize = 11.sp,
@@ -197,11 +197,10 @@ private fun RailMarker(isFirst: Boolean, isLast: Boolean, hasTrain: Boolean, mod
         val cy = size.height / 2
         if (!isFirst) drawLine(green.copy(alpha = 0.35f), Offset(cx, 0f), Offset(cx, cy), 3f)
         if (!isLast) drawLine(green.copy(alpha = 0.35f), Offset(cx, cy), Offset(cx, size.height), 3f)
-        if (hasTrain) {
-            drawCircle(green.copy(alpha = 0.25f), radius = 14f, center = Offset(cx, cy))
-            drawCircle(green, radius = 8f, center = Offset(cx, cy))
-        } else {
-            drawCircle(green.copy(alpha = 0.45f), radius = 5f, center = Offset(cx, cy))
+        when {
+            // 기차 아이콘이 점 대신 올라가므로 발광 배경만 깔아준다.
+            hasTrain -> drawCircle(green.copy(alpha = 0.22f), radius = 22f, center = Offset(cx, cy))
+            else -> drawCircle(green.copy(alpha = 0.45f), radius = 5f, center = Offset(cx, cy))
         }
     }
 }

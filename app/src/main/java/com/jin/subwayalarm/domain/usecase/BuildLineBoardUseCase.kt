@@ -37,7 +37,12 @@ class BuildLineBoardUseCase @Inject constructor() {
         positions: List<TrainPosition>,
         lineId: String,
     ): List<LineBoardRow> {
-        val byStatnId = positions.filter { it.lineId == lineId }.groupBy { it.statnId }
+        // 실측(2026-07-15, 1호선): API 가 같은 trainNo 를 recptnDt 만 다른 중복 행으로 줄 수 있다
+        // (79행 중 9대 중복 관측). 열차당 최신 수신 행만 남긴다.
+        val byStatnId = positions.filter { it.lineId == lineId }
+            .groupBy { it.trainNo }
+            .map { (_, rows) -> rows.maxBy { it.recptnDtEpochMillis } }
+            .groupBy { it.statnId }
         return stations.sortedBy { it.order }.map { station ->
             val markers = byStatnId[station.statnId].orEmpty().map { pos ->
                 LineTrainMarker(

@@ -84,6 +84,24 @@ class BuildLineBoardUseCaseTest {
     }
 
     @Test
+    fun `같은 trainNo 중복 행은 최신 recptnDt 한 건만 남는다`() {
+        // 실측(1호선): API 가 같은 열차를 recptnDt 만 다른 중복 행으로 반환하는 경우가 있다.
+        val older = line7.stations[4]
+        val newer = line7.stations[5]
+        val rows = useCase(
+            line7.stations,
+            line7.meta.directionPolarity,
+            listOf(
+                position(older.statnId, trainNo = "7100").copy(recptnDtEpochMillis = 1_000L),
+                position(newer.statnId, trainNo = "7100").copy(recptnDtEpochMillis = 2_000L),
+            ),
+            "1007",
+        )
+        assertTrue(rows[4].trains.isEmpty())
+        assertEquals(listOf("7100"), rows[5].trains.map { it.trainNo })
+    }
+
+    @Test
     fun `급행 플래그가 마커에 전달된다`() {
         val target = line7.stations[7]
         val rows = useCase(line7.stations, line7.meta.directionPolarity, listOf(position(target.statnId, isExpress = true)), "1007")
