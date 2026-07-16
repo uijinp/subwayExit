@@ -2,7 +2,6 @@ package com.jin.subwayalarm.data.local
 
 import com.jin.subwayalarm.domain.model.StationGraph
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,8 +96,23 @@ class SubwaySeedLinesTest {
     }
 
     @Test
-    fun `현재 6개 노선(1·3·4·6·7·9호선) 수록`() {
+    fun `1-9호선과 주요 광역선이 수록된다`() {
         val ids = SubwaySeed.allLines.map { it.meta.lineId }.toSet()
-        assertEquals(setOf("1001", "1003", "1004", "1006", "1007", "1009"), ids)
+        // 기존 1·3·4·6·7·9 + Extra 2·5·8 + 광역
+        assertTrue(ids.containsAll(setOf("1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009")))
+        assertTrue(ids.contains("1063")) // 경의중앙
+        assertTrue(ids.contains("1075")) // 수인분당
+        assertTrue(SubwaySeed.allLines.size >= 15)
+    }
+
+    @Test
+    fun `2호선은 순환 엣지로 시청-충정로가 연결된다`() {
+        val seed = ExtraLinesSeed.seed_1002
+        val g = StationGraph(seed.stations, seed.edges)
+        val cityhall = seed.stations.first { it.name == "시청" }
+        val chungjeong = seed.stations.first { it.name.contains("충정로") }
+        assertNotNull(g.path(cityhall.statnId, chungjeong.statnId))
+        // 순환: 짧은 경로가 존재
+        assertTrue(g.remainingStops(cityhall.statnId, chungjeong.statnId) < 20)
     }
 }

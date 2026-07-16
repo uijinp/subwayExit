@@ -96,6 +96,8 @@ class JourneyPlannerUseCase @Inject constructor() {
     }
 
     private companion object {
-        const val TRANSFER_PENALTY = 6
+        // 노선이 늘어날수록 동명 환승 허브가 많아져, 페널티가 낮으면 불필요 다중 환승이 최단이 된다.
+        // 대략 역 12개 우회까지는 환승 1회보다 직행을 선호.
+        const val TRANSFER_PENALTY = 12
     }
 }

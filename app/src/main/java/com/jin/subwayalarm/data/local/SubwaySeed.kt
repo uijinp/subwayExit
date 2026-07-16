@@ -15,7 +15,7 @@ import com.jin.subwayalarm.domain.model.Station
  *    order 증가 방향(= 노선 끝역 방향)으로 가는 열차의 updnLine 값.
  *  - trainNo 안정성은 7호선에서 75초 간격 시계열로 검증(39/40 유지) — 동일 API 라 타 노선 동일 가정.
  *
- * 보류(추후): 2호선(순환+지선), 5·8호선. 1호선은 BRANCHED 전체 수록.
+ * 1호선 BRANCHED 전체. 2·5·8 + 광역은 [ExtraLinesSeed] 에 수록.
  * ⚠️ avgSecToNext 는 명목값(120s) — "한 역 전 트리거" 목표엔 안전마진으로 흡수(설계 1-2/2-6).
  */
 object SubwaySeed {
@@ -529,7 +529,7 @@ object SubwaySeed {
         edges = line1Edges,
     )
 
-    val allLines: List<LineSeed> = listOf(line1, line3, line4, line6, line7, line9)
+    val allLines: List<LineSeed> = listOf(line1, line3, line4, line6, line7, line9) + ExtraLinesSeed.all
 
     // --- 하위호환(기존 테스트·StationRepositoryImpl 참조) ---
     const val LINE_7_ID = "1007"
