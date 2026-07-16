@@ -51,7 +51,8 @@ class LineMapViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             stationRepository.ensureSeeded()
-            val lines = stationRepository.lineMetas()
+            // 현황판은 실시간 지원 노선만 (미지원 노선은 폴링 무의미)
+            val lines = stationRepository.lineMetas().filter { it.supportsRealtime }
             _uiState.update { it.copy(lines = lines) }
             lines.firstOrNull()?.let { selectLine(it.lineId) }
         }

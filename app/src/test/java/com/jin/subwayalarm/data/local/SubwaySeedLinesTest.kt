@@ -96,13 +96,20 @@ class SubwaySeedLinesTest {
     }
 
     @Test
-    fun `1-9호선과 주요 광역선이 수록된다`() {
+    fun `1-9호선과 광역·경전철이 수록된다`() {
         val ids = SubwaySeed.allLines.map { it.meta.lineId }.toSet()
-        // 기존 1·3·4·6·7·9 + Extra 2·5·8 + 광역
         assertTrue(ids.containsAll(setOf("1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009")))
-        assertTrue(ids.contains("1063")) // 경의중앙
-        assertTrue(ids.contains("1075")) // 수인분당
-        assertTrue(SubwaySeed.allLines.size >= 15)
+        assertTrue(ids.containsAll(setOf("1063", "1075", "1077", "1065", "1067", "1092", "1094")))
+        // 이어서 추가: 서해·경강·GTX·인천·김포·의정부·용인
+        assertTrue(ids.containsAll(setOf("1093", "1081", "1032", "3110", "3200", "4920", "4600", "4500")))
+        assertTrue(SubwaySeed.allLines.size >= 24)
+    }
+
+    @Test
+    fun `인천1호선 등은 경로용이며 실시간 미지원 플래그`() {
+        val incheon = MoreLinesSeed.seed_3110
+        assertTrue(!incheon.meta.supportsRealtime)
+        assertTrue(MoreLinesSeed.seed_1093.meta.supportsRealtime) // 서해선은 실시간
     }
 
     @Test

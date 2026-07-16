@@ -529,7 +529,8 @@ object SubwaySeed {
         edges = line1Edges,
     )
 
-    val allLines: List<LineSeed> = listOf(line1, line3, line4, line6, line7, line9) + ExtraLinesSeed.all
+    val allLines: List<LineSeed> =
+        listOf(line1, line3, line4, line6, line7, line9) + ExtraLinesSeed.all + MoreLinesSeed.all
 
     // --- 하위호환(기존 테스트·StationRepositoryImpl 참조) ---
     const val LINE_7_ID = "1007"

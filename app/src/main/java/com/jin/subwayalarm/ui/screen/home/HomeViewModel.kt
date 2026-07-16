@@ -45,6 +45,8 @@ class HomeViewModel @Inject constructor(
         val legs: List<Leg> = emptyList(),
         val planning: Boolean = false,
         val routeError: String? = null,
+        /** 경로에 실시간 미지원 구간이 있으면 안내 문구. */
+        val realtimeWarning: String? = null,
     ) {
         val canStart: Boolean get() = legs.isNotEmpty()
     }
@@ -54,6 +56,7 @@ class HomeViewModel @Inject constructor(
 
     private var network: SubwayNetwork? = null
     private var allStationsFlat: List<Station> = emptyList()
+    private var lineMetaById: Map<String, com.jin.subwayalarm.domain.model.LineMeta> = emptyMap()
 
     /** 진행 중인 경로 계산 — 선택이 바뀌면 취소해서 늦게 끝난 이전 계산이 최신 결과를 덮지 않게 한다. */
     private var planJob: Job? = null
@@ -64,6 +67,7 @@ class HomeViewModel @Inject constructor(
             val net = stationRepository.buildNetwork()
             network = net
             val metas = stationRepository.lineMetas()
+            lineMetaById = metas.associateBy { it.lineId }
             allStationsFlat = metas.flatMap { stationRepository.stations(it.lineId) }
 
             val options = allStationsFlat
@@ -100,9 +104,14 @@ class HomeViewModel @Inject constructor(
             val legs = journeyPlanner(net, origin, dest)
             _uiState.update {
                 if (legs == null) {
-                    it.copy(planning = false, legs = emptyList(), routeError = "경로를 찾을 수 없어요")
+                    it.copy(planning = false, legs = emptyList(), routeError = "경로를 찾을 수 없어요", realtimeWarning = null)
                 } else {
-                    it.copy(planning = false, legs = legs, routeError = null)
+                    val noRt = legs.mapNotNull { leg ->
+                        lineMetaById[leg.lineId]?.takeIf { !it.supportsRealtime }?.displayName
+                    }.distinct()
+                    val warn = if (noRt.isEmpty()) null else
+                        "일부 구간(${noRt.joinToString("·")})은 실시간 추적이 안 돼요. 경로·환승 안내용입니다."
+                    it.copy(planning = false, legs = legs, routeError = null, realtimeWarning = warn)
                 }
             }
         }

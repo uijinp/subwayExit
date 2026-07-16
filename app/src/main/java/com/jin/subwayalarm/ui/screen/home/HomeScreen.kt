@@ -133,7 +133,17 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawatColors.Coral,
                 )
-                uiState.legs.isNotEmpty() -> RoutePreview(uiState.legs)
+                uiState.legs.isNotEmpty() -> {
+                    RoutePreview(uiState.legs)
+                    uiState.realtimeWarning?.let { warn ->
+                        Text(
+                            warn,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DawatColors.TextMuted,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))

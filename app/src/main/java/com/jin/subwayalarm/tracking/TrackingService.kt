@@ -136,6 +136,46 @@ class TrackingService : LifecycleService() {
             val lineMeta = stationRepository.lineMetas().firstOrNull { it.lineId == session.lineId }
             if (graph == null || lineMeta == null) break
 
+            // 인천·김포 등 실시간 API 미제공 노선 — 가속도 추정만 시도하고 긴 백오프로 대기
+            if (!lineMeta.supportsRealtime) {
+                setSensorEnabled(true)
+                updateNotification(buildNotification("이 구간은 실시간 미지원 · 추정 모드"))
+                val direction = graph.directionBetween(session.originStatnId, session.destStatnId)
+                val hybrid = HybridCoordinator.coordinate(
+                    HybridInput(
+                        graph = graph,
+                        direction = direction,
+                        lastKnownStatnId = session.currentStatnId,
+                        apiCorrectedStatnId = null,
+                        accelStopCountSinceResync = accelCounter.stopCount,
+                        destStatnId = session.destStatnId,
+                    ),
+                )
+                val result = trackingStep(
+                    TrackingStepInput(
+                        graph = graph,
+                        session = session,
+                        positions = emptyList(),
+                        nowEpochMillis = System.currentTimeMillis(),
+                        polarity = lineMeta.directionPolarity,
+                        excludedTerminusNames = lineMeta.excludedTerminusNames,
+                        accelEstimatedStatnId = hybrid.estimatedStatnId,
+                    ),
+                )
+                tripSessionRepository.save(result.updatedSession)
+                if (result.alert != null) {
+                    stopSensor()
+                    val stationName = graph.station(result.alert.alertStationId)?.name.orEmpty()
+                    alarmController.trigger(
+                        AlarmContent.FinalDestination(destinationName = stationName),
+                        AlarmSetting(),
+                    )
+                    break
+                }
+                delay(PollingIntervalPolicy.MATCHING_INTERVAL_SECONDS * 1000L)
+                continue
+            }
+
             when (val fetch = trainPositionRepository.fetchRealtimePosition(lineMeta.lineName)) {
                 is PositionFetchResult.Success -> {
                     consecutiveFailures = 0
