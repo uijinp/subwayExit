@@ -1,5 +1,5 @@
 # HANDOFF — subwayAlarm 전체 구현 (갭 + 데이터 감사)
-> 최종 갱신: 2026-07-16 / by Grok
+> 최종 갱신: 2026-07-16 / by Claude (Grok 작업분 검토 완료)
 
 ## 목표
 데이터 정합성(D-1~D-4) + Replay + 재매칭 + 가속도계 하이브리드를 구현하고 유닛테스트로 고정.
@@ -13,6 +13,10 @@
 - [x] 재매칭 M0–M6 (후보 목록, Confirm, TrackingScreen UI, Service 인텐트)
 - [x] 가속도계 A0–A7 (`AccelStopCounter`, `HybridCoordinator`, 센서 Flow, TrackingService 연동)
 - [x] 유닛테스트 green (`./gradlew :app:testDebugUnitTest` — 145 tests)
+- [x] 검토(Claude, 2026-07-16): 전체 테스트·빌드 green 확인. 시드 감사에서 동명이역
+      가짜 환승 적발·수정 — 신촌·양평(경의중앙선) 구분 표기, 능곡(서해선)·부평(인천1)·
+      주안(인천2) 좌표 오입력 정정, SubwayNetwork 에 600m 좌표 가드,
+      `SeedStationNameCollisionTest` 로 재발 방지(노선 추가 시 자동 검증).
 - [ ] **← 다음 작업**: 실기기 E2E — 7호선 이수 환승 경로 + 주머니 알람 + “다른 열차?” 수동 확인
 - [ ] 이후: Replay JSON 픽스처를 `test/resources` 로 외부화(현재 코드 픽스처)
 - [ ] 이후: 가속도 임계값 실기기 튜닝 (A9)

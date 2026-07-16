@@ -59,7 +59,7 @@ class SubwayNetwork(
             .map { NetworkEdge(it.name, lineId, isTransfer = false) }
 
         val sameNameTransfers = linesServing(stationName)
-            .filter { it != lineId }
+            .filter { it != lineId && isPhysicallySameStation(station, stationOn(it, stationName)) }
             .map { NetworkEdge(stationName, it, isTransfer = true) }
 
         // 별칭 환승: 다른 표기의 역명으로 그 역을 지나는 노선에 연결 (예: 이수 → 총신대입구(이수)·4호선)
@@ -70,5 +70,27 @@ class SubwayNetwork(
         }
 
         return sameLine + sameNameTransfers + aliasTransfers
+    }
+
+    /**
+     * 같은 이름이라도 물리적으로 다른 역이면(신촌·양평 사례) 환승으로 잇지 않는다.
+     * 좌표 미설정(0.0) 역은 판정 불가 → 기존처럼 이름을 신뢰한다.
+     */
+    private fun isPhysicallySameStation(a: Station, b: Station?): Boolean {
+        if (b == null) return false
+        if (a.lat == 0.0 || b.lat == 0.0) return true
+        val latMeters = (a.lat - b.lat) * METERS_PER_LAT_DEGREE
+        val lonMeters = (a.lon - b.lon) * METERS_PER_LON_DEGREE
+        return latMeters * latMeters + lonMeters * lonMeters <=
+            SAME_STATION_MAX_METERS * SAME_STATION_MAX_METERS
+    }
+
+    private companion object {
+        // 위도 1도 ≈ 111km, 서울 위도(37.5°)에서 경도 1도 ≈ 88km.
+        const val METERS_PER_LAT_DEGREE = 111_000.0
+        const val METERS_PER_LON_DEGREE = 88_000.0
+
+        // 대형 환승역의 승강장 간 거리도 대표 좌표 기준 수백 m 이내 — 600m 넘으면 별개 역으로 본다.
+        const val SAME_STATION_MAX_METERS = 600.0
     }
 }

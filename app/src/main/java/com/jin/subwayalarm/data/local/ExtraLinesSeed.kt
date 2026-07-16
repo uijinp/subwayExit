@@ -303,7 +303,8 @@ object ExtraLinesSeed {
     )
 
     private val stations_1063: List<Station> = listOf(
-        Station(statnId="1063000312", lineId="1063", name="신촌", order=0, avgSecToNext=SEC, lat=37.559733, lon=126.942597),
+        // 2호선 신촌과 물리적으로 다른 역(약 700m) — 역명 기반 환승 오연결을 막기 위해 구분 표기.
+        Station(statnId="1063000312", lineId="1063", name="신촌(경의중앙선)", order=0, avgSecToNext=SEC, lat=37.559733, lon=126.942597),
         Station(statnId="1063000313", lineId="1063", name="서울역", order=1, avgSecToNext=SEC, lat=37.557231, lon=126.97103),
         Station(statnId="1063000315", lineId="1063", name="가좌", order=2, avgSecToNext=SEC, lat=37.568491, lon=126.915487),
         Station(statnId="1063075318", lineId="1063", name="한국항공대", order=3, avgSecToNext=SEC, lat=37.602888, lon=126.868387), // 구 화전
@@ -327,7 +328,8 @@ object ExtraLinesSeed {
         Station(statnId="1063075329", lineId="1063", name="운정", order=21, avgSecToNext=SEC, lat=37.725826, lon=126.767257),
         Station(statnId="1063000137", lineId="1063", name="용문", order=22, avgSecToNext=SEC, lat=37.48223, lon=127.594647),
         Station(statnId="1063000323", lineId="1063", name="곡산", order=23, avgSecToNext=SEC, lat=37.645676, lon=126.801762),
-        Station(statnId="1063000135", lineId="1063", name="양평", order=24, avgSecToNext=SEC, lat=37.492773, lon=127.491837),
+        // 5호선 양평(영등포구)과 이름만 같은 경기 양평군 역(약 53km) — 환승 오연결 방지 구분 표기.
+        Station(statnId="1063000135", lineId="1063", name="양평(경의중앙선)", order=24, avgSecToNext=SEC, lat=37.492773, lon=127.491837),
         Station(statnId="1063075111", lineId="1063", name="이촌(국립중앙박물관)", order=25, avgSecToNext=SEC, lat=37.522295, lon=126.974733),
         Station(statnId="1063075123", lineId="1063", name="구리", order=26, avgSecToNext=SEC, lat=37.603392, lon=127.143869),
         Station(statnId="1063000138", lineId="1063", name="지평", order=27, avgSecToNext=SEC, lat=37.476393, lon=127.629874),

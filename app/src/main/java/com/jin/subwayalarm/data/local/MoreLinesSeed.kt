@@ -19,7 +19,8 @@ object MoreLinesSeed {
         Station(statnId="1093004003", lineId="1093", name="백마", order=2, avgSecToNext=SEC, lat=37.658239, lon=126.794461),
         Station(statnId="1093004004", lineId="1093", name="곡산", order=3, avgSecToNext=SEC, lat=37.645676, lon=126.801762),
         Station(statnId="1093004005", lineId="1093", name="대곡", order=4, avgSecToNext=SEC, lat=37.631626, lon=126.811024),
-        Station(statnId="1093004006", lineId="1093", name="능곡", order=5, avgSecToNext=SEC, lat=37.369864, lon=126.808573),
+        // 좌표 정정: 능곡(고양)은 경의중앙선과 같은 물리 역 — 기존 값(37.3698)은 시흥 근처 오입력이었다.
+        Station(statnId="1093004006", lineId="1093", name="능곡", order=5, avgSecToNext=SEC, lat=37.618808, lon=126.820783),
         Station(statnId="1093004007", lineId="1093", name="김포공항", order=6, avgSecToNext=SEC, lat=37.5617, lon=126.8041),
         Station(statnId="1093004008", lineId="1093", name="원종", order=7, avgSecToNext=SEC, lat=37.5239, lon=126.8049),
         Station(statnId="1093004009", lineId="1093", name="부천종합운동장", order=8, avgSecToNext=SEC, lat=37.505457, lon=126.797289),
@@ -141,7 +142,8 @@ object MoreLinesSeed {
         Station(statnId="3110003117", lineId="3110", name="갈산", order=10, avgSecToNext=SEC, lat=37.517268, lon=126.721514),
         Station(statnId="3110003118", lineId="3110", name="부평구청", order=11, avgSecToNext=SEC, lat=37.508407, lon=126.720555),
         Station(statnId="3110003119", lineId="3110", name="부평시장", order=12, avgSecToNext=SEC, lat=37.498383, lon=126.722244),
-        Station(statnId="3110003120", lineId="3110", name="부평", order=13, avgSecToNext=SEC, lat=37.508407, lon=126.720555),
+        // 좌표 정정: 1호선 부평(실측 시드 1001000152)과 같은 물리 역 — 기존 값은 2km 어긋난 오입력.
+        Station(statnId="3110003120", lineId="3110", name="부평", order=13, avgSecToNext=SEC, lat=37.490535, lon=126.723453),
         Station(statnId="3110003121", lineId="3110", name="동수", order=14, avgSecToNext=SEC, lat=37.485312, lon=126.718247),
         Station(statnId="3110003122", lineId="3110", name="부평삼거리", order=15, avgSecToNext=SEC, lat=37.477679, lon=126.710208),
         Station(statnId="3110003123", lineId="3110", name="간석오거리", order=16, avgSecToNext=SEC, lat=37.467048, lon=126.707938),
@@ -221,7 +223,8 @@ object MoreLinesSeed {
         Station(statnId="3200003215", lineId="3200", name="인천가좌", order=14, avgSecToNext=SEC, lat=37.4897, lon=126.675208),
         Station(statnId="3200003216", lineId="3200", name="가재울", order=15, avgSecToNext=SEC, lat=37.484192, lon=126.683673),
         Station(statnId="3200003217", lineId="3200", name="주안국가산단", order=16, avgSecToNext=SEC, lat=37.473703, lon=126.68113),
-        Station(statnId="3200003218", lineId="3200", name="주안", order=17, avgSecToNext=SEC, lat=37.473703, lon=126.68113),
+        // 좌표 정정: 1호선 주안(실측 시드 1001000156)과 같은 물리 역 — 기존 값은 약 1km 어긋난 오입력.
+        Station(statnId="3200003218", lineId="3200", name="주안", order=17, avgSecToNext=SEC, lat=37.464992, lon=126.679098),
         Station(statnId="3200003219", lineId="3200", name="시민공원", order=18, avgSecToNext=SEC, lat=37.458335, lon=126.681192),
         Station(statnId="3200003220", lineId="3200", name="석바위시장", order=19, avgSecToNext=SEC, lat=37.457611, lon=126.692575),
         Station(statnId="3200003221", lineId="3200", name="인천시청", order=20, avgSecToNext=SEC, lat=37.456833, lon=126.701306),
