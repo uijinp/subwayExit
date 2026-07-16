@@ -70,6 +70,8 @@ class TrackingStepUseCase @Inject constructor(
             direction = direction,
             polarity = polarity,
             excludedTerminusNames = input.excludedTerminusNames,
+            graph = input.graph,
+            destStatnId = session.destStatnId,
         )
         return when (candidates.size) {
             0 -> TrackingStepResult(session, null, emptyList())
@@ -163,6 +165,8 @@ class TrackingStepUseCase @Inject constructor(
             direction,
             polarity,
             input.excludedTerminusNames,
+            input.graph,
+            input.session.destStatnId,
         )
         val atCurrent = if (input.session.currentStatnId != input.session.originStatnId) {
             matchBoardedTrain.candidates(
@@ -172,6 +176,8 @@ class TrackingStepUseCase @Inject constructor(
                 direction,
                 polarity,
                 input.excludedTerminusNames,
+                input.graph,
+                input.session.destStatnId,
             )
         } else {
             emptyList()
