@@ -27,6 +27,7 @@ import com.jin.subwayalarm.domain.usecase.AccelStopCounter
 import com.jin.subwayalarm.domain.usecase.ConfirmBoardedTrainUseCase
 import com.jin.subwayalarm.domain.usecase.HybridCoordinator
 import com.jin.subwayalarm.domain.usecase.HybridInput
+import com.jin.subwayalarm.domain.usecase.NormalizePositionsUseCase
 import com.jin.subwayalarm.domain.usecase.RecptnDtCorrector
 import com.jin.subwayalarm.domain.usecase.TrackingStepInput
 import com.jin.subwayalarm.domain.usecase.TrackingStepUseCase
@@ -52,6 +53,7 @@ class TrackingService : LifecycleService() {
     @Inject lateinit var trainPositionRepository: TrainPositionRepository
     @Inject lateinit var boardingCandidateRepository: BoardingCandidateRepository
     @Inject lateinit var trackingStep: TrackingStepUseCase
+    @Inject lateinit var normalizePositions: NormalizePositionsUseCase
     @Inject lateinit var confirmBoardedTrain: ConfirmBoardedTrainUseCase
     @Inject lateinit var alarmController: AlarmController
     @Inject lateinit var linearAccelerationSource: LinearAccelerationSource
@@ -115,7 +117,7 @@ class TrackingService : LifecycleService() {
                     TrackingStepInput(
                         graph = graph,
                         session = session,
-                        positions = fetch.positions,
+                        positions = normalizePositions(fetch.positions, graph.stations),
                         nowEpochMillis = System.currentTimeMillis(),
                         polarity = lineMeta.directionPolarity,
                         excludedTerminusNames = lineMeta.excludedTerminusNames,
@@ -180,9 +182,11 @@ class TrackingService : LifecycleService() {
                 is PositionFetchResult.Success -> {
                     consecutiveFailures = 0
                     val now = System.currentTimeMillis()
+                    // API statnId 가 시드와 다른 역이 있어(광역선) 경계에서 한 번 정규화한다.
+                    val positions = normalizePositions(fetch.positions, graph.stations)
                     val direction = graph.directionBetween(session.originStatnId, session.destStatnId)
                     val boarded = session.boardedTrainNo
-                    val train = boarded?.let { no -> fetch.positions.firstOrNull { it.trainNo == no } }
+                    val train = boarded?.let { no -> positions.firstOrNull { it.trainNo == no } }
 
                     val apiCorrectedId = if (train != null) {
                         RecptnDtCorrector.correct(
@@ -227,7 +231,7 @@ class TrackingService : LifecycleService() {
                         TrackingStepInput(
                             graph = graph,
                             session = session,
-                            positions = fetch.positions,
+                            positions = positions,
                             nowEpochMillis = now,
                             polarity = lineMeta.directionPolarity,
                             excludedTerminusNames = lineMeta.excludedTerminusNames,

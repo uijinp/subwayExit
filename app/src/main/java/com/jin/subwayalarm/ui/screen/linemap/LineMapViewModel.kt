@@ -8,6 +8,7 @@ import com.jin.subwayalarm.data.repository.TrainPositionRepository
 import com.jin.subwayalarm.domain.model.LineMeta
 import com.jin.subwayalarm.domain.usecase.BuildLineBoardUseCase
 import com.jin.subwayalarm.domain.usecase.LineBoardRow
+import com.jin.subwayalarm.domain.usecase.NormalizePositionsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -28,6 +29,7 @@ class LineMapViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val trainPositionRepository: TrainPositionRepository,
     private val buildLineBoard: BuildLineBoardUseCase,
+    private val normalizePositions: NormalizePositionsUseCase,
 ) : ViewModel() {
 
     data class UiState(
@@ -70,9 +72,11 @@ class LineMapViewModel @Inject constructor(
             while (isActive) {
                 when (val fetch = trainPositionRepository.fetchRealtimePosition(meta.lineName)) {
                     is PositionFetchResult.Success -> {
-                        val rows = buildLineBoard(stations, meta.directionPolarity, fetch.positions, lineId)
+                        // API statnId 가 시드와 다른 역이 있어(광역선) 정규화 후 배치한다.
+                        val positions = normalizePositions(fetch.positions, stations)
+                        val rows = buildLineBoard(stations, meta.directionPolarity, positions, lineId)
                         val shown = rows.sumOf { it.trains.size }
-                        val totalOnLine = fetch.positions.count { it.lineId == lineId }
+                        val totalOnLine = positions.count { it.lineId == lineId }
                         _uiState.update {
                             it.copy(
                                 rows = rows,
