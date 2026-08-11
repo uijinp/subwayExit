@@ -32,6 +32,11 @@
       정규화 — statnId → 역명 → 느슨한 역명(괄호·공백·끝 “역” 무시) 3단계 폴백.
       실측 개선: 경의중앙선 12/19 유실 → **0**, 수인분당선 15/30 → 0, 신분당선 5/12 → 0,
       공항철도 2/18 → 0, 우이신설선 4/14 → 0. (경춘선 ‘용산’ 1건만 남음 = 시드 구간 밖, §B-잔여)
+- [x] **즐겨찾기(북마크) 경로 완료** (Claude, 2026-07-16) — 자주 쓰는 출발·도착을 저장하고
+      칩을 눌러 바로 불러온다. `FavoriteRouteEntity/Dao/Repository` + DB v4→5
+      **실제 마이그레이션**(`SubwayDatabase.MIGRATION_4_5`), 홈에 “⭐ 자주 가는 경로” 칩과
+      추적 버튼 옆 ★ 토글. 역명으로 저장하고 경로는 불러올 때 재계산 —
+      시드가 바뀌어도 즐겨찾기가 깨지지 않는다. 기기에서 저장→앱 재시작→불러오기 확인.
 - [ ] **← 다음 작업**: 실기기 E2E — 7호선 이수 환승 경로 + 주머니 알람 + “다른 열차?” 수동 확인
 - [ ] 이후(§B-잔여): 시드 구간 밖 열차 — 3호선 일산선(주엽·화정·삼송…), 4호선 과천·안산선(12역),
       경춘선 용산. 해당 구간을 시드에 넣으면 해소되나 지금은 그 구간 여정을 못 만들 뿐 기존 추적엔 무해.
@@ -194,6 +199,12 @@ curl -s "http://swopenapi.seoul.go.kr/api/subway/$KEY/json/realtimePosition/1/50
 - 테스트: `WalkTransferTest`, `ReplayTripRunnerTest`, `AccelStopCounterTest`, `HybridCoordinatorTest` 등
 
 ## 주의사항
+- **DB 스키마를 바꿀 때 `fallbackToDestructiveMigration()` 에 기대지 말 것.** v5 부터
+  `favorite_route` 에 사용자가 저장한 즐겨찾기가 들어있고, 이건 재시드로 복구되지 않는다
+  (역·노선 시드와 다름). 버전을 올릴 땐 `SubwayDatabase.MIGRATION_4_5` 처럼 실제
+  Migration 을 만들어 `DatabaseModule.addMigrations(...)` 에 등록할 것.
+  exportSchema=false 라 컴파일 타임 검증이 없으므로, **기기에 기존 버전이 깔린 상태에서
+  덮어 설치해 Room 이 스키마 불일치 예외를 던지지 않는지 반드시 확인**해야 한다.
 - 1호선 API `lineName` 은 여전히 `"1호선"` (표시만 displayName).
 - FGS 타입 dataSync 유지 — 센서는 보조.
 - OEM 배터리 최적화·실기기 센서 동작은 미검증.

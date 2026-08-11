@@ -6,6 +6,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jin.subwayalarm.domain.model.FavoriteRoute
 import com.jin.subwayalarm.domain.model.Leg
 import com.jin.subwayalarm.tracking.TrackingService
 import com.jin.subwayalarm.ui.theme.DawatColors
@@ -127,6 +131,14 @@ fun HomeScreen(
                 )
             }
 
+            if (uiState.favorites.isNotEmpty()) {
+                FavoriteRoutes(
+                    favorites = uiState.favorites,
+                    onSelect = viewModel::applyFavorite,
+                    onRemove = viewModel::removeFavorite,
+                )
+            }
+
             when {
                 uiState.planning -> Text("경로 계산 중…", style = MaterialTheme.typography.bodyMedium, color = DawatColors.TextMuted)
                 uiState.routeError != null -> Text(
@@ -148,31 +160,96 @@ fun HomeScreen(
             }
 
             // 버튼은 화면 맨 아래가 아니라 경로 바로 밑에 둔다(엄지로 닿기 쉽고 내용과 묶여 보인다).
-            Button(
-                enabled = uiState.canStart,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DawatColors.Green,
-                    contentColor = DawatColors.OnGreen,
-                    disabledContainerColor = DawatColors.Divider,
-                ),
-                onClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    scope.launch {
-                        if (viewModel.startTrip()) {
-                            ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
-                            onTripStarted()
-                        }
-                    }
-                },
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("▶ 추적 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Button(
+                    enabled = uiState.canStart,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DawatColors.Green,
+                        contentColor = DawatColors.OnGreen,
+                        disabledContainerColor = DawatColors.Divider,
+                    ),
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        scope.launch {
+                            if (viewModel.startTrip()) {
+                                ContextCompat.startForegroundService(context, TrackingService.startIntent(context))
+                                onTripStarted()
+                            }
+                        }
+                    },
+                ) {
+                    Text("▶ 추적 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+
+                // 즐겨찾기 토글 — 출발·도착이 모두 정해졌을 때만 누를 수 있다.
+                val saved = uiState.isCurrentRouteFavorite
+                OutlinedButton(
+                    enabled = uiState.currentRoute != null,
+                    onClick = viewModel::toggleFavorite,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(56.dp),
+                ) {
+                    Text(if (saved) "★" else "☆", fontSize = 20.sp, color = if (saved) DawatColors.Green else DawatColors.TextMuted)
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * 저장한 경로를 칩으로 나열. 누르면 출발·도착이 채워지고 경로가 다시 계산된다.
+ * 칩 안의 ✕ 로 바로 삭제. 최근 쓴 것이 앞에 온다.
+ */
+@Composable
+private fun FavoriteRoutes(
+    favorites: List<FavoriteRoute>,
+    onSelect: (FavoriteRoute) -> Unit,
+    onRemove: (FavoriteRoute) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "⭐ 자주 가는 경로",
+            style = MaterialTheme.typography.labelMedium,
+            color = DawatColors.TextMuted,
+            fontWeight = FontWeight.Bold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            favorites.forEach { route ->
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(DawatColors.Card)
+                        .clickable { onSelect(route) }
+                        .padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${route.originName} → ${route.destinationName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = DawatColors.TextPrimary,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onRemove(route) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) { Text("✕", fontSize = 12.sp, color = DawatColors.TextMuted) }
+                }
+            }
         }
     }
 }

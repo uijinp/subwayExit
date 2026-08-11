@@ -2,9 +2,11 @@ package com.jin.subwayalarm.ui.screen.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jin.subwayalarm.data.repository.FavoriteRouteRepository
 import com.jin.subwayalarm.data.repository.JourneyPlanRepository
 import com.jin.subwayalarm.data.repository.StationRepository
 import com.jin.subwayalarm.data.repository.TripSessionRepository
+import com.jin.subwayalarm.domain.model.FavoriteRoute
 import com.jin.subwayalarm.domain.model.JourneyPlan
 import com.jin.subwayalarm.domain.model.Leg
 import com.jin.subwayalarm.domain.model.Station
@@ -27,6 +29,7 @@ class HomeViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val tripSessionRepository: TripSessionRepository,
     private val journeyPlanRepository: JourneyPlanRepository,
+    private val favoriteRouteRepository: FavoriteRouteRepository,
     private val journeyPlanner: JourneyPlannerUseCase,
     private val locationProvider: LocationProvider,
     private val nearestStation: NearestStationUseCase,
@@ -47,8 +50,20 @@ class HomeViewModel @Inject constructor(
         val routeError: String? = null,
         /** 경로에 실시간 미지원 구간이 있으면 안내 문구. */
         val realtimeWarning: String? = null,
+        /** 저장한 즐겨찾기 경로 (최근 사용 순). */
+        val favorites: List<FavoriteRoute> = emptyList(),
     ) {
         val canStart: Boolean get() = legs.isNotEmpty()
+
+        /** 지금 고른 출발/도착이 즐겨찾기에 들어 있는지 — 별 아이콘 채움 여부. */
+        val currentRoute: FavoriteRoute?
+            get() = if (originName != null && destinationName != null) {
+                FavoriteRoute(originName, destinationName)
+            } else {
+                null
+            }
+
+        val isCurrentRouteFavorite: Boolean get() = currentRoute?.let { it in favorites } == true
     }
 
     private val _uiState = MutableStateFlow(UiState())
@@ -76,6 +91,33 @@ class HomeViewModel @Inject constructor(
                 .sortedBy { it.name }
             _uiState.update { it.copy(allStations = options) }
         }
+        viewModelScope.launch {
+            favoriteRouteRepository.observeAll().collect { saved ->
+                _uiState.update { it.copy(favorites = saved) }
+            }
+        }
+    }
+
+    /** 별 버튼 — 지금 고른 경로를 즐겨찾기에 넣거나 뺀다. */
+    fun toggleFavorite() {
+        val route = _uiState.value.currentRoute ?: return
+        val alreadySaved = _uiState.value.isCurrentRouteFavorite
+        viewModelScope.launch {
+            if (alreadySaved) favoriteRouteRepository.remove(route) else favoriteRouteRepository.add(route)
+        }
+    }
+
+    /** 즐겨찾기를 눌러 출발·도착을 채우고 경로를 다시 계산한다. */
+    fun applyFavorite(route: FavoriteRoute) {
+        _uiState.update {
+            it.copy(originName = route.originName, destinationName = route.destinationName, detectMessage = null)
+        }
+        viewModelScope.launch { favoriteRouteRepository.markUsed(route) }
+        recomputeRoute()
+    }
+
+    fun removeFavorite(route: FavoriteRoute) {
+        viewModelScope.launch { favoriteRouteRepository.remove(route) }
     }
 
     fun selectOrigin(name: String) {
