@@ -523,7 +523,10 @@ object SubwaySeed {
             supportsRealtime = true,
             topology = LineTopology.BRANCHED,
             directionPolarity = DirectionPolarity("1"),
-            displayName = "1호선 (연천–인천·경부)",
+            // 시드가 경인 구간만 담던 시절엔 범위를 괄호로 고지했으나, 지금은 연천–인천·경부
+            // 전 구간(102역)이 들어와 있어 불필요하다. 길면 역 검색 목록의 모든 행이 두 줄로
+            // 접혀 훑어보기 어려워지므로 짧게 유지한다.
+            displayName = "1호선",
         ),
         stations = line1Stations,
         edges = line1Edges,

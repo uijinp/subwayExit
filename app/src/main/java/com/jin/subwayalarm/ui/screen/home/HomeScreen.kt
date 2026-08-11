@@ -23,6 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -146,8 +147,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
+            // 버튼은 화면 맨 아래가 아니라 경로 바로 밑에 둔다(엄지로 닿기 쉽고 내용과 묶여 보인다).
             Button(
                 enabled = uiState.canStart,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -171,6 +171,8 @@ fun HomeScreen(
             ) {
                 Text("▶ 추적 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
+
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
@@ -212,6 +214,10 @@ private fun RoutePreview(legs: List<Leg>) {
 /**
  * 검색 가능한 선택 필드. 입력 텍스트로 [options] 를 실시간 필터링해 드롭다운으로 보여준다.
  * options 는 (id, 표시명) 목록.
+ *
+ * 이미 고른 역을 바꿀 때 지우개로 글자를 다 지워야 했던 문제 때문에,
+ * 필드를 누르면(=목록을 열면) 검색어를 비워 **전체 목록부터 보여준다.**
+ * 고르지 않고 닫으면 원래 선택값이 그대로 복원된다.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -223,41 +229,64 @@ private fun SearchableDropdown(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var query by remember(selectedId, options) {
-        mutableStateOf(options.firstOrNull { it.first == selectedId }?.second.orEmpty())
-    }
-    val filtered = if (query.isBlank()) {
+    val selectedLabel = options.firstOrNull { it.first == selectedId }?.second.orEmpty()
+
+    /** 사용자가 직접 입력 중인 검색어. null = 선택된 값을 그대로 보여주는 상태. */
+    var typed by remember(selectedId) { mutableStateOf<String?>(null) }
+
+    val text = typed ?: selectedLabel
+    val filtered = if (typed.isNullOrBlank()) {
         options
     } else {
-        options.filter { it.second.contains(query.trim(), ignoreCase = true) }
+        options.filter { it.second.contains(typed!!.trim(), ignoreCase = true) }
     }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it },
+        onExpandedChange = { wantOpen ->
+            expanded = wantOpen
+            // 열 때: 검색어를 비워 전체 목록을 보여준다. 닫을 때: 선택값 복원.
+            typed = if (wantOpen) "" else null
+        },
         modifier = modifier,
     ) {
         OutlinedTextField(
-            value = query,
+            value = text,
             onValueChange = {
-                query = it
+                typed = it
                 expanded = true
             },
             label = { Text(label) },
             singleLine = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            placeholder = if (expanded && selectedLabel.isNotEmpty()) {
+                { Text(selectedLabel, color = DawatColors.TextMuted) }
+            } else {
+                null
+            },
+            trailingIcon = {
+                if (text.isNotEmpty()) {
+                    IconButton(onClick = { typed = ""; expanded = true }) {
+                        Text("✕", color = DawatColors.TextMuted, fontSize = 16.sp)
+                    }
+                } else {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
         )
         ExposedDropdownMenu(
             expanded = expanded && filtered.isNotEmpty(),
-            onDismissRequest = { expanded = false },
+            onDismissRequest = {
+                expanded = false
+                typed = null
+            },
         ) {
             filtered.take(60).forEach { (id, name) ->
                 DropdownMenuItem(
                     text = { Text(name) },
                     onClick = {
                         onSelect(id)
-                        query = name
+                        typed = null
                         expanded = false
                     },
                 )

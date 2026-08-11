@@ -89,10 +89,22 @@ class SubwaySeedLinesTest {
         assertEquals("1001000161", seed.stations.first { it.name == "인천" }.statnId)
     }
 
+    /**
+     * 예전엔 1호선 시드가 경인 구간만 담아서 displayName 에 "(연천–인천·경부)" 로 범위를
+     * 고지했고, 그걸 검증하는 테스트가 있었다. 지금은 전 구간(102역)이 들어와 고지가 불필요하고
+     * (커버리지는 바로 위 `1호선은 연천-인천-경부 포함 100역 이상 BRANCHED` 가 검증한다),
+     * 오히려 이름이 길면 역 검색 목록의 모든 행이 두 줄로 접혀 훑어보기 어려워진다.
+     * 그래서 "범위 고지" 대신 "목록에서 읽기 좋은 길이" 를 불변식으로 둔다.
+     */
     @Test
-    fun `1호선 표시명에 경부 범위 고지`() {
-        assertTrue(SubwaySeed.line1.meta.displayName.contains("경부") ||
-            SubwaySeed.line1.meta.displayName.contains("인천"))
+    fun `노선 표시명은 검색 목록에서 접히지 않게 짧아야 한다`() {
+        val tooLong = SubwaySeed.allLines
+            .map { it.meta.displayName }
+            .filter { it.length > 10 }
+        assertTrue(
+            "표시명이 길면 '역명 · 노선A·노선B' 조합이 두 줄로 접힌다: $tooLong",
+            tooLong.isEmpty(),
+        )
     }
 
     @Test
