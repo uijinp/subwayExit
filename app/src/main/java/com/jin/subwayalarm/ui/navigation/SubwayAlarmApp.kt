@@ -11,7 +11,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.jin.subwayalarm.ui.component.StatusBarIcons
 import com.jin.subwayalarm.ui.screen.alarm.AlarmScreen
 import com.jin.subwayalarm.ui.screen.home.HomeScreen
 import com.jin.subwayalarm.ui.screen.linemap.LineMapScreen
@@ -26,6 +28,8 @@ private object Routes {
     const val SETTINGS = "settings"
 }
 
+private val DARK_TOP_ROUTES = setOf(Routes.TRACKING, Routes.ALARM)
+
 /**
  * 화면 흐름: 홈 → 추적 중(탑승 열차 선택 포함) → 알람 → (환승이면) 다음 구간 추적 / (끝이면) 홈.
  * [alarmTrigger] 는 풀스크린 알림 인텐트로 앱이 열렸을 때(MainActivity) 값이 증가해 알람 화면으로 이동시킨다.
@@ -35,6 +39,10 @@ private object Routes {
 fun SubwayAlarmApp(alarmTrigger: Int, onAlarmFinished: () -> Unit) {
     val navController = rememberNavController()
     val appViewModel: AppViewModel = hiltViewModel()
+
+    // 추적(잉크 띠)·알람(파랑)은 어두운 바탕 → 흰 상태바 아이콘. 나머지는 밝은 바탕 → 검은 아이콘.
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    StatusBarIcons(lightIcons = backStackEntry?.destination?.route in DARK_TOP_ROUTES)
 
     LaunchedEffect(alarmTrigger) {
         if (alarmTrigger > 0) navController.navigate(Routes.ALARM) { launchSingleTop = true }

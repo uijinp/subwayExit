@@ -41,7 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jin.subwayalarm.domain.Josa
 import com.jin.subwayalarm.ui.component.LineBadge
 import com.jin.subwayalarm.ui.component.PrimaryPill
-import com.jin.subwayalarm.ui.component.StatusBarIcons
 import com.jin.subwayalarm.ui.theme.Hls
 
 /**
@@ -57,7 +56,6 @@ fun AlarmScreen(
     val loadedState by viewModel.uiState.collectAsStateWithLifecycle()
     // 확인 버튼과 "이미 꺼짐" 감지가 동시에 화면을 넘기지 않게(퇴장 애니메이션 중에도 이 화면은 잠시 살아 있다).
     var leaving by remember { mutableStateOf(false) }
-    StatusBarIcons(lightIcons = true)
     BackHandler { /* 알람은 "확인했어요" 로만 끈다 */ }
 
     LaunchedEffect(loadedState) {
@@ -200,7 +198,7 @@ private fun NextLegCard(lineName: String, title: String, caption: String) {
         Spacer(modifier = Modifier.width(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(caption, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Hls.OnAccent)
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Hls.OnAccent, maxLines = 1)
+            Text(title, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, color = Hls.OnAccent, maxLines = 2)
         }
     }
 }

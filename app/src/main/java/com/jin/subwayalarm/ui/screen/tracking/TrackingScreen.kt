@@ -58,7 +58,6 @@ import com.jin.subwayalarm.ui.component.Eyebrow
 import com.jin.subwayalarm.ui.component.LineBadge
 import com.jin.subwayalarm.ui.component.OutlinePill
 import com.jin.subwayalarm.ui.component.PrimaryPill
-import com.jin.subwayalarm.ui.component.StatusBarIcons
 import com.jin.subwayalarm.ui.component.TextLink
 import com.jin.subwayalarm.ui.theme.Hls
 import kotlinx.coroutines.delay
@@ -79,7 +78,6 @@ fun TrackingScreen(
 ) {
     val loadedState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    StatusBarIcons(lightIcons = true)
 
     LaunchedEffect(loadedState?.isActive) {
         val state = loadedState

@@ -17,7 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -199,17 +199,17 @@ fun HlsSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: Strin
 }
 
 /**
- * 이 화면이 보이는 동안 상태바 아이콘 색을 지정. [lightIcons] = 어두운(잉크·파랑) 바탕 위 흰 아이콘.
- * 화면을 떠나면 밝은 바탕 기본값(어두운 아이콘)으로 돌린다.
+ * 상태바 아이콘 색. [lightIcons] = 어두운(잉크·파랑) 바탕 위 흰 아이콘.
+ *
+ * 화면마다 부르면 전환 애니메이션 동안 새 화면이 먼저 설정하고 옛 화면의 정리가 나중에 덮어써서
+ * 알람·추적 화면 위에 검은 아이콘이 남았다. 그래서 내비게이션 수준에서 현재 목적지로 한 번만 정한다.
  */
 @Composable
 fun StatusBarIcons(lightIcons: Boolean) {
     val view = LocalView.current
     if (view.isInEditMode) return
-    DisposableEffect(lightIcons) {
-        val window = (view.context as? Activity)?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        controller?.isAppearanceLightStatusBars = !lightIcons
-        onDispose { controller?.isAppearanceLightStatusBars = true }
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !lightIcons
     }
 }
