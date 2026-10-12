@@ -117,6 +117,11 @@ class TrackingService : LifecycleService() {
                 lifecycleScope.launch { publishRematchCandidates() }
                 return START_STICKY
             }
+            ACTION_RESUME -> {
+                // 화면이 진행 중 여정을 보여줄 때마다 보냄 — 이미 돌고 있으면 아무것도 바꾸지 않는다.
+                ensureForegroundAndLoop()
+                return START_STICKY
+            }
         }
 
         startForeground(TRACKING_NOTIFICATION_ID, buildNotification("추적 준비 중"))
@@ -550,6 +555,7 @@ class TrackingService : LifecycleService() {
         private const val ACTION_STOP = "com.jin.subwayalarm.action.STOP_TRACKING"
         const val ACTION_CONFIRM_TRAIN = "com.jin.subwayalarm.action.CONFIRM_TRAIN"
         const val ACTION_REQUEST_REMATCH = "com.jin.subwayalarm.action.REQUEST_REMATCH"
+        private const val ACTION_RESUME = "com.jin.subwayalarm.action.RESUME"
         const val EXTRA_TRAIN_NO = "trainNo"
         private const val TRACKING_CHANNEL_ID = "tracking"
         private const val TRACKING_NOTIFICATION_ID = 2001
@@ -578,5 +584,12 @@ class TrackingService : LifecycleService() {
 
         fun rematchIntent(context: Context): Intent =
             Intent(context, TrackingService::class.java).apply { action = ACTION_REQUEST_REMATCH }
+
+        /**
+         * 추적 루프가 없을 때만 다시 시작(멱등). 앱 업데이트·프로세스 종료로 서비스가 사라졌는데
+         * 저장된 여정은 남아 있는 경우, 추적 화면을 열면 조용히 이어서 추적한다.
+         */
+        fun resumeIntent(context: Context): Intent =
+            Intent(context, TrackingService::class.java).apply { action = ACTION_RESUME }
     }
 }
