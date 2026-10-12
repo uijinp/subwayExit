@@ -1,5 +1,5 @@
 # HANDOFF — subwayAlarm 전체 구현 (갭 + 데이터 감사)
-> 최종 갱신: 2026-07-16 / by Claude (§A 광역선 4개 간선 재작성 **완료**)
+> 최종 갱신: 2026-10-12 / by Claude (전체 재검토 — §C 발견 사항, 다음 작업 = §C P0 수정)
 
 ## 목표
 데이터 정합성(D-1~D-4) + Replay + 재매칭 + 가속도계 하이브리드를 구현하고 유닛테스트로 고정.
@@ -37,11 +37,58 @@
       **실제 마이그레이션**(`SubwayDatabase.MIGRATION_4_5`), 홈에 “⭐ 자주 가는 경로” 칩과
       추적 버튼 옆 ★ 토글. 역명으로 저장하고 경로는 불러올 때 재계산 —
       시드가 바뀌어도 즐겨찾기가 깨지지 않는다. 기기에서 저장→앱 재시작→불러오기 확인.
-- [ ] **← 다음 작업**: 실기기 E2E — 7호선 이수 환승 경로 + 주머니 알람 + “다른 열차?” 수동 확인
+- [x] **전체 재검토 (Claude, 2026-10-12)** — 빌드 green, 테스트 338개 통과. 코드 대조 + API 실측으로
+      알람 누락·오알람·크래시 결함 다수 확인 → **§C** 에 우선순위별 정리.
+- [ ] **← 다음 작업**: §C P0-1·P0-2 (2호선·우이신설선 극성 정정 + 시드 버전 기반 재적재) —
+      둘은 한 묶음이다. 극성만 고치면 기존 설치에는 반영되지 않는다(§C P0-2 참고).
+- [ ] 이후: §C 나머지 P0 → P1 순서. 그다음 실기기 E2E(이수 환승 + 주머니 알람 + “다른 열차?”).
 - [ ] 이후(§B-잔여): 시드 구간 밖 열차 — 3호선 일산선(주엽·화정·삼송…), 4호선 과천·안산선(12역),
       경춘선 용산. 해당 구간을 시드에 넣으면 해소되나 지금은 그 구간 여정을 못 만들 뿐 기존 추적엔 무해.
 - [ ] 이후: Replay JSON 픽스처를 `test/resources` 로 외부화(현재 코드 픽스처)
 - [ ] 이후: 가속도 임계값 실기기 튜닝 (A9)
+
+---
+
+## §C 전체 재검토 결과 (2026-10-12) — 미수정, 다음 작업 목록
+
+검토 방법: 추적 엔진·플랫폼 계층을 나눠 코드 리뷰 → **모든 항목을 코드로 직접 대조**,
+극성은 실시간 API 를 55초 간격 2회 조회해 열차 실제 이동 방향으로 실측.
+경로는 `app/src/main/java/com/jin/subwayalarm/` 기준.
+
+### P0 — 알람이 안 울리거나, 엉뚱한 데서 울리거나, 앱이 죽는다
+
+| # | 결함 | 위치 | 확인 근거 |
+|---|---|---|---|
+| P0-1 | **2호선 극성 반대** — `ascendingUpdnLine="1"` 인데 실측은 `"0"`. 2호선 탑승 매칭이 전부 반대 방향 열차를 잡는다. **우이신설선도 반대 유력**(3/3). 신림선은 판정 불가(2/4), 경춘·서해·경강·GTX-A 는 표본 부족 | `data/local/ExtraLinesSeed.kt` 2호선·우이신설선 meta | 실측 2호선 13/14대 일치. 나머지 노선은 ✅ |
+| P0-2 | **시드 갱신이 역 “개수” 변화에만 반응** — 순서·이름·극성만 바뀐 수정은 기존 설치의 Room 에 영영 안 들어간다. 극성은 Room(`LineMetaEntity.ascendingUpdnLine`)에서 읽으므로 P0-1 을 고쳐도 기존 사용자에겐 무효. 7월 광역선 순서 수정도 기기에 반영 안 됐을 수 있다 | `data/repository/StationRepositoryImpl.kt:21-31`, `data/local/Mappers.kt:46` | 코드 확인. 해결안: 시드 버전 상수 + 버전 바뀌면 전 노선 트랜잭션 재적재(역은 정적 데이터라 매번 재적재해도 수 ms) |
+| P0-3 | **웨이크락 없음** — FGS 는 CPU 를 깨워두지 않는다. 화면 꺼지면 `delay()`(uptime 기반)가 멈춰 폴링이 늦어진다. 사용자 보고 “중간에 추적이 안 됨”의 가장 유력한 원인 | `tracking/TrackingService.kt` 폴링 루프, Manifest(WAKE_LOCK 없음) | grep 결과 PowerManager/WAKE_LOCK 전무. 해결: 추적 중 타임아웃 붙은 PARTIAL_WAKE_LOCK |
+| P0-4 | **환승 알람이 한 역 일찍 내리라고 안내** — 직전역 이름을 `transferStationName` 으로 넘김 → “내방역에서 내려 4호선으로 갈아타세요”(실제 환승역은 이수). AlarmScreen·TrackingScreen 의 “여기서 내려”도 동일 | `TrackingService.kt:250-254`, `alarm/NotificationHelper.kt:75`, `ui/screen/alarm/AlarmScreen.kt`, `ui/screen/tracking/TrackingScreen.kt` | 코드 확인. 환승역 = 현재 구간의 도착역(`session.destStatnId`)을 써야 함 |
+| P0-5 | **보행 환승역이 출발/도착이면 출발=도착 구간 생성 → 크래시 루프** — 이수→사당 = `[7호선 이수→이수, 4호선 …]`. `directionBetween` 의 `require(p.size>=2)` 예외가 lifecycleScope 에서 미처리 → `START_REDELIVER_INTENT` 로 재시작마다 크래시 | `domain/usecase/JourneyPlannerUseCase.kt:75-93`, `domain/model/StationGraph.kt:99`, `TrackingService.kt:187` | 코드 추적 확인. 해결: 같은 역 구간 제거 + 루프에 예외 가드 |
+| P0-6 | **목적지에 안 가는 열차를 자동 매칭** — 적합 후보가 없으면 `base` 로 폴백, 유일 후보면 확정. 예: 서울역→부평에서 천안행만 있으면 매칭 → 구로에서 갈라져 알람 안 울림. 2호선 지선 셔틀도 같은 경로로 오매칭 | `domain/usecase/MatchBoardedTrainUseCase.kt:69` | 코드 확인. 해결: 부적합 후보는 자동 확정 금지, 수동 선택 후보로만 노출 |
+| P0-7 | **2호선 시청·충정로 출발 시 방향 판정 반전** — 순환을 닫는 간선(충정로 42 ↔ 시청 0) 때문에 `p[1].order >= p[0].order` 가 양방향 모두 같은 값 | `domain/model/StationGraph.kt:100` | 시드 order 확인(시청:0 … 충정로:42 + 닫는 간선). 해결: 순환 닫는 간선은 래핑으로 취급 |
+| P0-8 | **실시간 미지원 노선(인천1·2, 김포, 의정부, 용인) 구간은 알람 불가** — `boardedTrainNo` 가 안 채워져 매번 매칭 분기로 가고 가속도 추정이 무시됨. 다음 구간으로도 못 넘어감 | `domain/usecase/TrackingStepUseCase.kt:54-56`, `TrackingService.kt:142-178` | 코드 확인. 해결: 미지원 노선은 탑승 확정을 수동/즉시로 처리하고 ACCEL 경로로 진입 |
+
+### P1 — 오알람·크래시·신뢰성
+
+| # | 결함 | 위치 |
+|---|---|---|
+| P1-1 | 가속도 추정 중복 카운트 — 이미 전진시킨 `currentStatnId` 에 누적 `stopCount` 를 매 폴링 다시 더함 → 정차 1회·폴링 3회면 3역 전진 → 조기 오알람 | `TrackingService.kt:209`, `domain/usecase/HybridCoordinator.kt` |
+| P1-2 | 시드 구간 밖 역에 열차가 있으면 `remainingStops` 의 `require()` 가 예외 → 크래시 | `domain/model/StationGraph.kt:154`, `TrackingService.kt:244` |
+| P1-3 | 알람 인텐트 extra 를 지우지 않아 회전·최근앱 복귀 시 유령 알람 화면 → “확인” 누르면 구간 건너뜀. `AdvanceJourney` 가 세션 ALERTED 여부를 안 봐서 비멱등 | `ui/MainActivity.kt`, `domain/usecase/AdvanceJourneyUseCase.kt:30-40` |
+| P1-4 | 알람이 확인할 때까지 계속되지 않음 — 트리거 직후 서비스 종료(프로세스 보호 상실), 진동이 USAGE_ALARM 아님(절전 시 무시), 소리 1회 | `TrackingService.kt:258-259`, `alarm/VibratorController.kt`, `alarm/NotificationHelper.kt` |
+| P1-5 | 잠금화면 위에 알람 화면이 안 뜸(`setShowWhenLocked`/`setTurnScreenOn` 없음), Android 14+ 풀스크린 인텐트 권한 확인 없음 | `ui/MainActivity.kt` |
+| P1-6 | 지선 셔틀·V자 환승(까치산→홍대입구, 가산디지털단지→구일, 홍대입구→서울역 경의중앙)을 단일 구간으로 계산 | `domain/usecase/JourneyPlannerUseCase.kt` |
+| P1-7 | 열차 확인·재매칭 버튼이 `startForegroundService` 를 쓰는데 해당 분기는 `startForeground` 를 안 부름 → 서비스가 안 떠 있을 때 누르면 크래시 가능 | `ui/screen/tracking/TrackingScreen.kt:84,95`, `TrackingService.kt:81-92` |
+| P1-8 | 알림 권한 거부 시 아무 경고 없음(알람이 진동만 남음), 추적 시작 탭마다 권한 요청 | `ui/screen/home/HomeScreen.kt` |
+| P1-9 | 노선 현황판이 백그라운드에서도 15초 폴링 → 공용 API 한도 소모 → 추적이 429 백오프 | `ui/screen/linemap/LineMapViewModel.kt:76-101` |
+| P1-10 | Android 15 dataSync 일 6시간 한도 대비 없음(`onTimeout` 미구현) — 멈춘 세션이 한도 소진 | `TrackingService.kt` |
+
+### 기능 업그레이드 후보 (검토 시 제안)
+1. 알람 설정 화면 — `AlarmSetting`(몇 정거장 전·소리·진동·반복) 모델은 있으나 UI 와 서비스 배선이 없음(항상 기본값).
+2. 급행 대응 — 매칭이 `isExpress` 를 안 봄. 목적지를 통과하는 급행에 탑승 매칭될 수 있음(9호선·1호선·경의중앙·수인분당). 급행 정차역 데이터 필요.
+3. 진행 중 추적 복귀 — 추적 알림 탭/앱 재실행 시 추적 화면으로(지금은 홈).
+4. 도착 예상 시간 — `avgSecToNext` 가 거의 전부 120초 고정이라 정밀 ETA 는 역간 소요시간 데이터 필요.
+5. 즐겨찾기 원탭 시작(홈 위젯·빠른 설정 타일), 막차 표시(`isLastTrain` 미사용), 시드 구간 확장(3호선 일산선·4호선 과천/안산선).
 
 ---
 
