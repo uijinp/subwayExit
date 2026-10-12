@@ -1,5 +1,7 @@
 package com.jin.subwayalarm.alarm
 
+import com.jin.subwayalarm.domain.Josa
+
 /**
  * 알람 발화 시 보여줄 문구. 환승 구간이면 Transfer, 마지막 구간이면 FinalDestination.
  *
@@ -36,7 +38,7 @@ sealed class AlarmContent {
 
     val body: String
         get() = when (this) {
-            is Transfer -> "$passedStationName 통과 · $whenLabel $stationName · ${nextLineName}으로 갈아타세요"
+            is Transfer -> "$passedStationName 통과 · $whenLabel $stationName · ${Josa.ro(nextLineName)} 갈아타세요"
             is FinalDestination -> "$passedStationName 통과 · $whenLabel $stationName"
         }
 }
