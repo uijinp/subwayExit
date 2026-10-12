@@ -129,6 +129,16 @@ class TrackingService : LifecycleService() {
         return START_REDELIVER_INTENT
     }
 
+    /**
+     * Android 15+: dataSync FGS 는 하루 합계 6시간 한도가 있고, 다 쓰면 시스템이 이걸 부른 뒤
+     * 몇 초 안에 멈추지 않으면 앱을 강제 종료한다(§C P1-10). 여정 하나가 이만큼 길 일은 없으므로
+     * (웨이크락 상한 3시간) 멈춘 세션으로 보고 정리한다.
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "포그라운드 서비스 시간 한도 도달 — 추적을 멈춥니다")
+        stopTracking()
+    }
+
     override fun onDestroy() {
         trackingJob?.cancel()
         ringingTimeoutJob?.cancel()
