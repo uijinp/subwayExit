@@ -23,4 +23,7 @@ interface StationDao {
 
     @Query("DELETE FROM station WHERE lineId = :lineId")
     suspend fun clearLine(lineId: String)
+
+    @Query("DELETE FROM station")
+    suspend fun clearAll()
 }

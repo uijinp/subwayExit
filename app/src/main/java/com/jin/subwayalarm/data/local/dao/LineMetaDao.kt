@@ -17,4 +17,7 @@ interface LineMetaDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(lines: List<LineMetaEntity>)
+
+    @Query("DELETE FROM line_meta")
+    suspend fun clearAll()
 }

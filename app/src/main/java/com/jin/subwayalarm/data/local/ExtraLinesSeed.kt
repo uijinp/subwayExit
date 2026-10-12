@@ -129,8 +129,11 @@ object ExtraLinesSeed {
         "1002002343" to "1002002344",
     )
     val seed_1002 = SubwaySeed.LineSeed(
+        // 극성 실측(2026-10-12): updnLine=0 열차가 순번 증가(시청→을지로입구, 내선) 방향으로
+        // 이동(본선 14대 중 13대 일치). 예전 값 "1" 은 반대여서 2호선 탑승 매칭이 늘 반대 방향 열차를 잡았다.
+        // 성수·신정 지선 셔틀의 극성은 표본이 없어 미검증.
         meta = LineMeta(lineId="1002", lineName="2호선", supportsRealtime=true,
-            topology=LineTopology.LOOP, directionPolarity=DirectionPolarity("1"),
+            topology=LineTopology.LOOP, directionPolarity=DirectionPolarity("0"),
             displayName="2호선"),
         stations=stations_1002, edges=edges_1002,
     )
