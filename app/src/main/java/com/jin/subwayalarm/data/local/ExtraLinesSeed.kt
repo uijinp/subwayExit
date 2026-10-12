@@ -130,7 +130,7 @@ object ExtraLinesSeed {
     )
     val seed_1002 = SubwaySeed.LineSeed(
         // 극성 실측(2026-10-12): updnLine=0 열차가 순번 증가(시청→을지로입구, 내선) 방향으로
-        // 이동(본선 14대 중 13대 일치). 예전 값 "1" 은 반대여서 2호선 탑승 매칭이 늘 반대 방향 열차를 잡았다.
+        // 이동(본선 2회 측정 14대 중 13대, 6회 측정 37/37대). 예전 값 "1" 은 반대여서 2호선 탑승 매칭이 늘 반대 방향 열차를 잡았다.
         // 성수·신정 지선 셔틀의 극성은 표본이 없어 미검증.
         meta = LineMeta(lineId="1002", lineName="2호선", supportsRealtime=true,
             topology=LineTopology.LOOP, directionPolarity=DirectionPolarity("0"),
@@ -654,8 +654,10 @@ object ExtraLinesSeed {
         "1092004712" to "1092004713",
     )
     val seed_1092 = SubwaySeed.LineSeed(
+        // 극성 실측(2026-10-12, 40초 간격 6회 조회): updnLine=0 열차가 순번 증가 방향으로 이동(7/7대).
+        // 예전 값 "1" 은 반대여서 탑승 매칭이 반대 방향 열차를 잡았다.
         meta = LineMeta(lineId="1092", lineName="우이신설선", supportsRealtime=true,
-            topology=LineTopology.LINEAR, directionPolarity=DirectionPolarity("1"),
+            topology=LineTopology.LINEAR, directionPolarity=DirectionPolarity("0"),
             displayName="우이신설선"),
         stations=stations_1092, edges=edges_1092,
     )
@@ -686,6 +688,7 @@ object ExtraLinesSeed {
         "1094000405" to "1094000403",
     )
     val seed_1094 = SubwaySeed.LineSeed(
+        // 극성 미확정(2026-10-12 실측 4/7대만 "0" 쪽 — 판정 불가). 표본이 더 모일 때까지 기존 값 유지.
         meta = LineMeta(lineId="1094", lineName="신림선", supportsRealtime=true,
             topology=LineTopology.LINEAR, directionPolarity=DirectionPolarity("1"),
             displayName="신림선"),

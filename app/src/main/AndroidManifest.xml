@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- 추적 중 CPU 를 깨워둬야 화면이 꺼져도 폴링이 늦어지지 않는다(FGS 는 CPU 를 깨워두지 않음). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 출발역 자동감지(Wi-Fi/기지국 측위, 포그라운드 1회성). 추적은 실시간 API 이므로
          백그라운드 위치·정밀 GPS 는 요청하지 않음. 설계 D-2 를 이 범위로만 완화. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

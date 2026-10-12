@@ -1,5 +1,6 @@
 package com.jin.subwayalarm.alarm
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -11,6 +12,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.jin.subwayalarm.R
+import com.jin.subwayalarm.domain.model.AlarmSetting
 import com.jin.subwayalarm.ui.MainActivity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -27,6 +29,8 @@ class NotificationHelper @Inject constructor(
 ) {
     companion object {
         const val ALARM_CHANNEL_ID = "alarm"
+        /** 진동만 모드용. 안드로이드 채널의 소리는 만든 뒤 앱에서 바꿀 수 없어 채널을 따로 둔다. */
+        const val ALARM_SILENT_CHANNEL_ID = "alarm_silent"
         const val ALARM_NOTIFICATION_ID = 1001
         const val EXTRA_SHOW_ALARM = "com.jin.subwayalarm.extra.SHOW_ALARM"
         const val ACTION_DISMISS_ALARM = "com.jin.subwayalarm.action.DISMISS_ALARM"
@@ -41,15 +45,21 @@ class NotificationHelper @Inject constructor(
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
         val channel = NotificationChannel(ALARM_CHANNEL_ID, "하차 알람", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "목적지 한 역 전 알람"
+            description = "내릴 역이 가까워지면 소리와 진동으로 알림"
             enableVibration(false) // 진동은 VibratorController 가 파형으로 직접 제어
             setSound(alarmSound, audioAttributes)
             setBypassDnd(true)
         }
-        manager.createNotificationChannel(channel)
+        val silent = NotificationChannel(ALARM_SILENT_CHANNEL_ID, "하차 알람 (진동만)", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "내릴 역이 가까워지면 진동으로만 알림"
+            enableVibration(false)
+            setSound(null, null)
+            setBypassDnd(true)
+        }
+        manager.createNotificationChannels(listOf(channel, silent))
     }
 
-    fun showAlertNotification(content: AlarmContent) {
+    fun showAlertNotification(content: AlarmContent, setting: AlarmSetting) {
         ensureChannel()
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
 
@@ -70,24 +80,24 @@ class NotificationHelper @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val (title, text) = when (content) {
-            is AlarmContent.Transfer ->
-                "환승하세요" to "${content.transferStationName}역에서 내려 ${content.nextLineName}으로 갈아타세요"
-            is AlarmContent.FinalDestination ->
-                "하차 준비" to "${content.destinationName} 다음 역에서 내리세요"
-        }
-
-        val notification = NotificationCompat.Builder(context, ALARM_CHANNEL_ID)
+        val channelId = if (setting.soundEnabled) ALARM_CHANNEL_ID else ALARM_SILENT_CHANNEL_ID
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification_alarm)
-            .setContentTitle(title)
-            .setContentText(text)
+            .setContentTitle(content.title)
+            .setContentText(content.body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
-            .addAction(0, "해제", dismissPendingIntent)
-            .setAutoCancel(true)
-            .build()
+            .addAction(0, "확인했어요", dismissPendingIntent)
+            // 밀어서 지우면 진동만 계속 울리고 여정도 안 넘어갔다 — 알람은 "확인"으로만 끈다.
+            .setOngoing(true)
+            .setAutoCancel(false)
+        if (setting.showOnLockScreen) builder.setFullScreenIntent(fullScreenPendingIntent, true)
+        val notification = builder.build().apply {
+            // 확인할 때까지 알림 소리를 반복(채널 소리가 한 번만 나던 문제).
+            if (setting.repeatUntilDismissed) flags = flags or Notification.FLAG_INSISTENT
+        }
 
         runCatching {
             NotificationManagerCompat.from(context).notify(ALARM_NOTIFICATION_ID, notification)

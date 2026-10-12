@@ -1,7 +1,9 @@
 package com.jin.subwayalarm.alarm
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.Build
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -36,7 +38,19 @@ class VibratorController @Inject constructor(
             waveform.amplitudes.toIntArray(),
             waveform.repeatFromIndex,
         )
-        vibrator.vibrate(effect)
+        // 알람 용도로 표시해야 절전 모드·방해 금지에서도 무시되지 않는다(용도 없이 울리면 절전 시 꺼짐).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(
+                effect,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+        }
     }
 
     fun stop() {

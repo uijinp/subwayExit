@@ -5,8 +5,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 직전역 도달 시 알람 발화·해제 조율 (4-3). EvaluateAlertUseCase 가 Trigger 를 반환하면
- * 작업순서 7(추적 루프)에서 이 컨트롤러를 호출하게 된다.
+ * 알람 발화·해제 조율 (4-3). 추적 서비스가 판정 Trigger 를 받으면 호출한다.
+ * 소리 여부·반복·잠금화면 표시는 사용자 설정([AlarmSetting])을 따른다.
  */
 @Singleton
 class AlarmController @Inject constructor(
@@ -15,9 +15,7 @@ class AlarmController @Inject constructor(
 ) {
     fun trigger(content: AlarmContent, setting: AlarmSetting) {
         vibratorController.start(setting.vibrationPattern, setting.repeatUntilDismissed)
-        notificationHelper.showAlertNotification(content)
-        // TODO(step9): setting.soundEnabled=false 대응은 채널 분리 필요(Android O+ 채널 소리는
-        // 생성 후 앱에서 변경 불가) — UI 설정 화면과 함께 설계.
+        notificationHelper.showAlertNotification(content, setting)
     }
 
     fun dismiss() {
