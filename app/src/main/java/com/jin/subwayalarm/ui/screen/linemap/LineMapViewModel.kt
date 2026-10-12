@@ -22,7 +22,9 @@ import javax.inject.Inject
 
 /**
  * 노선 실시간 현황판. 선택한 노선의 전체 역을 나열하고 지금 어느 역에 열차가 있는지 보여준다.
- * 화면이 떠 있는 동안만 주기 폴링(ViewModel 소멸 시 함께 종료 — 별도 서비스 없음).
+ * 화면이 실제로 보이는 동안만 주기 폴링한다. 예전엔 홈 버튼으로 나가도 ViewModel 이 살아 있어
+ * 백그라운드에서 15초마다 공용 API 를 불렀고, 같은 키를 쓰는 추적 루프가 호출 한도(429)에 걸렸다(§C P1-9).
+ * 화면이 [onVisible]/[onHidden] 을 알려준다.
  */
 @HiltViewModel
 class LineMapViewModel @Inject constructor(
@@ -49,6 +51,7 @@ class LineMapViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private var pollJob: Job? = null
+    private var visible = true
 
     init {
         viewModelScope.launch {
@@ -60,12 +63,30 @@ class LineMapViewModel @Inject constructor(
         }
     }
 
+    /** 화면이 다시 보임(ON_RESUME) — 선택된 노선 폴링 재개. 이미 돌고 있으면 그대로. */
+    fun onVisible() {
+        visible = true
+        val lineId = _uiState.value.selectedLineId ?: return
+        if (pollJob?.isActive != true) startPolling(lineId)
+    }
+
+    /** 화면이 가려짐(ON_PAUSE) — 폴링 중단. 마지막 결과는 그대로 둔다. */
+    fun onHidden() {
+        visible = false
+        pollJob?.cancel()
+    }
+
     fun selectLine(lineId: String) {
         if (_uiState.value.selectedLineId == lineId && pollJob?.isActive == true) return
         pollJob?.cancel()
         _uiState.update {
             it.copy(selectedLineId = lineId, rows = emptyList(), shownTrainCount = 0, hiddenTrainCount = 0, loading = true, error = null)
         }
+        if (visible) startPolling(lineId)
+    }
+
+    private fun startPolling(lineId: String) {
+        pollJob?.cancel()
         pollJob = viewModelScope.launch {
             val meta = stationRepository.lineMetas().firstOrNull { it.lineId == lineId } ?: return@launch
             val stations = stationRepository.stations(lineId)

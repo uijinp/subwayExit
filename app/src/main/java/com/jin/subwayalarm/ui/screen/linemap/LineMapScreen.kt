@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jin.subwayalarm.domain.model.Direction
 import com.jin.subwayalarm.domain.usecase.LineBoardRow
@@ -54,6 +55,11 @@ fun LineMapScreen(
     viewModel: LineMapViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // 보이는 동안만 폴링(백그라운드에서 API 한도를 쓰면 추적이 429 에 걸린다).
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onVisible()
+        onPauseOrDispose { viewModel.onHidden() }
+    }
 
     Scaffold(containerColor = Hls.Paper) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
