@@ -83,16 +83,37 @@ class MatchBoardedTrainUseCase @Inject constructor() {
             positions, lineId, originStatnId, direction, polarity,
             excludedTerminusNames, graph, destStatnId,
         )
-        return when (list.size) {
-            0 -> BoardingMatch.NoCandidate
-            1 -> BoardingMatch.Matched(list.first().trainNo)
+        val only = list.singleOrNull()
+        return when {
+            list.isEmpty() -> BoardingMatch.NoCandidate
+            only != null && isAutoConfirmable(only, graph, originStatnId, destStatnId) -> BoardingMatch.Matched(only.trainNo)
             else -> BoardingMatch.Ambiguous(list)
         }
     }
 
     /**
+     * 후보가 하나뿐이어도 목적지에 가지 않는 게 확실한 열차는 자동 확정하지 않는다.
+     * [candidates] 는 적합 후보가 없으면 수동 선택용으로 부적합 후보도 돌려주는데, 예전엔 그
+     * 하나를 그대로 확정해 — 서울역→부평에서 천안행만 있을 때 — 구로에서 갈라져 알람이 영영
+     * 안 울렸다. 적합한 다음 열차가 오면 그때 자동 확정된다.
+     */
+    fun isAutoConfirmable(
+        candidate: BoardingCandidate,
+        graph: StationGraph?,
+        originStatnId: String,
+        destStatnId: String?,
+    ): Boolean {
+        if (graph == null || destStatnId == null) return true
+        return terminusServesDestination(graph, originStatnId, destStatnId, candidate.terminusName)
+    }
+
+    /**
      * 열차가 origin 에서 terminus 로 갈 때 dest 를 지나는지.
      * 종착을 그래프에서 못 찾으면 보수적으로 true(필터 안 함).
+     *
+     * 열차 경로는 "목적지 쪽 다음 역"에서 출발역을 거치지 않고 종착까지 가는 길로 본다.
+     * 최단 경로만 보면 순환선(2호선)에서 반대로 도는 쪽이 더 짧은 종착(강남→사당 방향의 성수행)을
+     * 목적지에 안 간다고 오판한다. 분기·직선 노선에서는 최단 경로와 같은 결과다.
      */
     fun terminusServesDestination(
         graph: StationGraph,
@@ -103,8 +124,10 @@ class MatchBoardedTrainUseCase @Inject constructor() {
         if (terminusName.isNullOrBlank()) return true
         val term = findStationByTerminusName(graph, terminusName) ?: return true
         if (term.statnId == destStatnId) return true
-        val pathToTerm = graph.path(originStatnId, term.statnId) ?: return true
-        return pathToTerm.any { it.statnId == destStatnId }
+        val next = graph.path(originStatnId, destStatnId)?.getOrNull(1) ?: return true
+        if (next.statnId == term.statnId) return false
+        val route = graph.path(next.statnId, term.statnId, avoid = originStatnId) ?: return false
+        return route.any { it.statnId == destStatnId }
     }
 
     private fun findStationByTerminusName(graph: StationGraph, terminusName: String) =

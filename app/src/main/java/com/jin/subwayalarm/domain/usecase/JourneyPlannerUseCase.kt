@@ -92,7 +92,9 @@ class JourneyPlannerUseCase @Inject constructor() {
                 alightStationName = path.last().stationName,
             ),
         )
-        return legs
+        // 보행 환승역(이수 ↔ 총신대입구(이수))이 출발·도착이면 "이수→이수" 처럼 타지 않는 구간이
+        // 생긴다. 그대로 두면 출발=도착 세션이 만들어져 추적 서비스가 시작하자마자 죽었다.
+        return legs.filter { it.boardStationName != it.alightStationName }.ifEmpty { null }
     }
 
     private companion object {

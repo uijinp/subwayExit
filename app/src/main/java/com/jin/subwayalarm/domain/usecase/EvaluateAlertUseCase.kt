@@ -48,10 +48,11 @@ class EvaluateAlertUseCase @Inject constructor() {
         val path = graph.path(originId, destId)
             ?: return AlertEvaluation.Invalid("경로 없음: $originId → $destId")
         val direction = graph.directionBetween(originId, destId)
-        val alertStation = graph.stationBeforeArrival(destId, direction, leadStations, originId = originId)
-            ?: return AlertEvaluation.Invalid(
-                "직전역을 계산할 수 없습니다(목적지가 진행방향상 시발 인근): dest=$destId",
-            )
+        // "N정거장 전" 설정이 남은 정거장보다 크면 출발역에서 울린다(늦느니 일찍). 예전엔 직전역을
+        // 못 구해 Invalid 를 돌려 알람이 영영 울리지 않았다.
+        val effectiveLead = leadStations.coerceIn(1, path.size - 1)
+        val alertStation = graph.stationBeforeArrival(destId, direction, effectiveLead, originId = originId)
+            ?: return AlertEvaluation.Invalid("직전역을 계산할 수 없습니다: dest=$destId")
 
         // A) 직전역 진입/도착
         if (currentStatnId == alertStation.statnId &&
@@ -62,7 +63,7 @@ class EvaluateAlertUseCase @Inject constructor() {
 
         // B) 직전역의 한 정거장 전 출발 — 경로 위 역
         val stationBeforeAlert =
-            graph.stationBeforeArrival(destId, direction, leadStations + 1, originId = originId)
+            graph.stationBeforeArrival(destId, direction, effectiveLead + 1, originId = originId)
         if (stationBeforeAlert != null &&
             currentStatnId == stationBeforeAlert.statnId &&
             trainStatus == TrainStatus.DEPARTED

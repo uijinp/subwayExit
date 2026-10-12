@@ -156,17 +156,25 @@ class EvaluateAlertUseCaseTest {
     }
 
     @Test
-    fun `목적지가 진행방향상 시발 인근이라 직전역이 없으면 Invalid`() {
+    fun `알람 시점이 남은 정거장보다 크면 출발역으로 당겨서 울린다`() {
         val g = graph()
-        // origin A → dest B(바로 다음역), leadStations=2 → A 이전(그래프 밖) → Invalid
+        // origin A → dest B(바로 다음역), leadStations=2 → 예전엔 Invalid 로 알람이 영영 안 울렸다.
+        // 이제 알람역을 출발역 A 로 당긴다(1정거장 설정과 같은 동작 — 늦느니 일찍).
         val result = useCase(
-            g,
-            originId = "A",
-            destId = "B",
-            currentStatnId = "A",
-            trainStatus = TrainStatus.ARRIVED,
-            leadStations = 2,
+            g, originId = "A", destId = "B", currentStatnId = "A",
+            trainStatus = TrainStatus.ARRIVED, leadStations = 2,
         )
-        assertTrue(result is AlertEvaluation.Invalid)
+        assertTrue(result is AlertEvaluation.Trigger)
+        assertEquals("A", (result as AlertEvaluation.Trigger).alertStationId)
+    }
+
+    @Test
+    fun `알람 시점 2정거장이면 두 역 전에서 울린다`() {
+        val g = graph()
+        // A→E, lead 2 → 알람역 C
+        val atB = useCase(g, originId = "A", destId = "E", currentStatnId = "B", trainStatus = TrainStatus.ARRIVED, leadStations = 2)
+        assertEquals(AlertEvaluation.NoTrigger, atB)
+        val atC = useCase(g, originId = "A", destId = "E", currentStatnId = "C", trainStatus = TrainStatus.ARRIVED, leadStations = 2)
+        assertEquals("C", (atC as AlertEvaluation.Trigger).alertStationId)
     }
 }

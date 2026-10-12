@@ -60,14 +60,18 @@ class StationGraph(
     private fun require(statnId: String): Station =
         byId[statnId] ?: throw IllegalArgumentException("그래프에 없는 역: $statnId")
 
-    /** origin → dest 최단 경로(양끝 포함). 없으면 null. */
-    fun path(fromId: String, toId: String): List<Station>? {
+    /**
+     * origin → dest 최단 경로(양끝 포함). 없으면 null.
+     * [avoid] 역은 지나지 않는다 — 순환선에서 "이 방향으로 돌아가는" 경로를 구할 때 쓴다.
+     */
+    fun path(fromId: String, toId: String, avoid: String? = null): List<Station>? {
         if (fromId == toId) return listOf(require(fromId))
         if (!contains(fromId) || !contains(toId)) return null
         val prev = mutableMapOf<String, String?>()
         val q = ArrayDeque<String>()
         q.add(fromId)
         prev[fromId] = null
+        if (avoid != null && avoid != fromId && avoid != toId) prev[avoid] = null
         while (q.isNotEmpty()) {
             val cur = q.removeFirst()
             if (cur == toId) break
@@ -90,14 +94,35 @@ class StationGraph(
     }
 
     /**
-     * 출발→목적 경로의 첫 Hop 기준 방향.
-     * order 가 증가하는 쪽을 ASCENDING 으로 두어 updnLine 극성과 맞춘다(1호선 분기 포함).
+     * 출발→목적 경로의 진행 방향. order 가 증가하는 쪽이 ASCENDING(updnLine 극성과 짝).
+     *
+     * 순번이 정확히 한 칸 차이인 첫 hop 으로 정한다. 분기 접속(2호선 성수 10 → 용답 43)이나
+     * 순환을 닫는 간선(2호선 충정로 42 ↔ 시청 0)은 순번이 크게 뛰어, 첫 hop 만 보면
+     * 시청에서 출발할 때 양방향이 모두 ASCENDING 으로 나오는 사고가 있었다.
+     * 한 칸 hop 이 하나도 없으면(시청↔충정로 1정거장 여정 등) 그 간선이 순환을 닫는
+     * 간선인지 보고 부호를 뒤집는다.
      */
     fun directionBetween(originId: String, destId: String): Direction {
         val p = path(originId, destId)
             ?: throw IllegalArgumentException("경로 없음: $originId → $destId")
         require(p.size >= 2) { "출발역과 목적역이 동일합니다: $originId" }
-        return if (p[1].order >= p[0].order) Direction.ASCENDING else Direction.DESCENDING
+        for (i in 0 until p.lastIndex) {
+            when (p[i + 1].order - p[i].order) {
+                1 -> return Direction.ASCENDING
+                -1 -> return Direction.DESCENDING
+            }
+        }
+        val a = p[0]
+        val b = p[1]
+        val ascending = (b.order > a.order) != isLoopClosingEdge(a, b)
+        return if (ascending) Direction.ASCENDING else Direction.DESCENDING
+    }
+
+    /** 최소 순번 역이 양쪽으로 이어진 순환선에서, 그 역에 붙은 순번 비인접 간선. */
+    private fun isLoopClosingEdge(a: Station, b: Station): Boolean {
+        val first = ordered.first()
+        if (a.statnId != first.statnId && b.statnId != first.statnId) return false
+        return adj[first.statnId].orEmpty().size >= 2 && kotlin.math.abs(a.order - b.order) > 1
     }
 
     /**
@@ -150,7 +175,12 @@ class StationGraph(
         return current
     }
 
+    /**
+     * 남은 정거장 수. 그래프에 없는 역이 들어오면 예외 대신 0 — 추적 루프·화면이 이 값을
+     * 표시·폴링 주기에 쓰는데, 예외가 나면 서비스가 죽어 재시작마다 다시 죽었다.
+     */
     fun remainingStops(currentId: String, destId: String): Int {
+        if (!contains(currentId) || !contains(destId)) return 0
         val p = path(currentId, destId) ?: return kotlin.math.abs(require(destId).order - require(currentId).order)
         return (p.size - 1).coerceAtLeast(0)
     }

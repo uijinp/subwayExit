@@ -73,9 +73,11 @@ class TrackingStepUseCase @Inject constructor(
             graph = input.graph,
             destStatnId = session.destStatnId,
         )
-        return when (candidates.size) {
-            0 -> TrackingStepResult(session, null, emptyList())
-            1 -> TrackingStepResult(
+        val autoConfirm = candidates.size == 1 &&
+            matchBoardedTrain.isAutoConfirmable(candidates.first(), input.graph, session.originStatnId, session.destStatnId)
+        return when {
+            candidates.isEmpty() -> TrackingStepResult(session, null, emptyList())
+            autoConfirm -> TrackingStepResult(
                 session.copy(
                     boardedTrainNo = candidates.first().trainNo,
                     state = TripState.TRACKING,
@@ -108,6 +110,11 @@ class TrackingStepUseCase @Inject constructor(
             return evaluateAndBuild(input, updated, TrainStatus.ARRIVED)
         }
 
+        if (!input.graph.contains(train.statnId)) {
+            // 시드 구간 밖 역(예: 3호선 일산선 구간)에 있는 열차 — 그 ID 로 현재역을 덮으면
+            // 이후 남은 역 계산·판정이 전부 깨진다. 마지막으로 알던 위치를 유지하고 이번 판정은 건너뛴다.
+            return TrackingStepResult(session.copy(lastSyncAtEpochMillis = input.nowEpochMillis), null)
+        }
         val corrected = RecptnDtCorrector.correct(
             graph = input.graph,
             rawStatnId = train.statnId,
