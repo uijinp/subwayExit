@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,7 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jin.subwayalarm.domain.model.Direction
 import com.jin.subwayalarm.domain.usecase.LineBoardRow
 import com.jin.subwayalarm.domain.usecase.LineTrainMarker
-import com.jin.subwayalarm.ui.theme.DawatColors
+import com.jin.subwayalarm.ui.theme.Hls
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -54,7 +55,7 @@ fun LineMapScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(containerColor = DawatColors.LightBg) { padding ->
+    Scaffold(containerColor = Hls.Paper) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
             // 헤더
             Row(
@@ -63,7 +64,7 @@ fun LineMapScreen(
             ) {
                 Box(
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                        .background(DawatColors.Card).clickable(onClick = onBack),
+                        .background(Hls.CardAlt).clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) { Text("←", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                 Spacer(modifier = Modifier.width(10.dp))
@@ -80,13 +81,13 @@ fun LineMapScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) DawatColors.Green else DawatColors.Card)
+                            .background(if (selected) Hls.Accent else Hls.CardAlt)
                             .clickable { viewModel.selectLine(line.lineId) }
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     ) {
                         Text(
                             line.displayName.ifBlank { line.lineName },
-                            color = if (selected) DawatColors.OnGreen else DawatColors.TextMuted,
+                            color = if (selected) Hls.OnAccent else Hls.Muted,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                         )
@@ -125,10 +126,10 @@ private fun StatusLine(uiState: LineMapViewModel.UiState) {
         else -> ""
     }
     if (text.isNotEmpty()) {
-        Text(text, style = MaterialTheme.typography.bodySmall, color = DawatColors.TextMuted, modifier = Modifier.padding(bottom = 8.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = Hls.Muted, modifier = Modifier.padding(bottom = 8.dp))
     }
     uiState.error?.let {
-        Text(it, style = MaterialTheme.typography.bodySmall, color = DawatColors.Coral, modifier = Modifier.padding(bottom = 8.dp))
+        Text(it, style = MaterialTheme.typography.bodySmall, color = Hls.ErrorText, modifier = Modifier.padding(bottom = 8.dp))
     }
 }
 
@@ -139,12 +140,9 @@ private fun BoardStationRow(row: LineBoardRow, isFirst: Boolean, isLast: Boolean
         modifier = Modifier.fillMaxWidth().height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 레일 + 레일 위 기차 아이콘
+        // 레일 + 열차 위치 점
         Box(modifier = Modifier.width(44.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             RailMarker(isFirst = isFirst, isLast = isLast, hasTrain = hasTrain, modifier = Modifier.fillMaxSize())
-            if (hasTrain) {
-                Text("🚈", fontSize = 20.sp)
-            }
         }
         // 열차번호 배지(방향·급행 색)
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -155,7 +153,7 @@ private fun BoardStationRow(row: LineBoardRow, isFirst: Boolean, isLast: Boolean
             row.station.name,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (hasTrain) FontWeight.Bold else FontWeight.Normal,
-            color = if (hasTrain) DawatColors.TextPrimary else DawatColors.TextMuted,
+            color = if (hasTrain) Hls.Ink else Hls.Muted,
             modifier = Modifier.weight(1f),
         )
     }
@@ -169,9 +167,9 @@ private fun TrainNumberBadge(train: LineTrainMarker) {
         null -> ""
     }
     val bg = when {
-        train.isExpress -> DawatColors.Coral
-        train.direction == Direction.DESCENDING -> DawatColors.HeroCard
-        else -> DawatColors.Green
+        train.isExpress -> Hls.AccentDeep
+        train.direction == Direction.DESCENDING -> Hls.Ink
+        else -> Hls.Accent
     }
     Box(
         modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(bg).padding(horizontal = 6.dp, vertical = 3.dp),
@@ -182,7 +180,7 @@ private fun TrainNumberBadge(train: LineTrainMarker) {
                 append(train.trainNo)
                 if (train.isExpress) append(" 급")
             },
-            color = DawatColors.OnDark,
+            color = Hls.OnAccent,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -191,16 +189,18 @@ private fun TrainNumberBadge(train: LineTrainMarker) {
 
 @Composable
 private fun RailMarker(isFirst: Boolean, isLast: Boolean, hasTrain: Boolean, modifier: Modifier = Modifier) {
-    val green = DawatColors.Green
     Canvas(modifier = modifier) {
         val cx = size.width / 2
         val cy = size.height / 2
-        if (!isFirst) drawLine(green.copy(alpha = 0.35f), Offset(cx, 0f), Offset(cx, cy), 3f)
-        if (!isLast) drawLine(green.copy(alpha = 0.35f), Offset(cx, cy), Offset(cx, size.height), 3f)
-        when {
-            // 기차 아이콘이 점 대신 올라가므로 발광 배경만 깔아준다.
-            hasTrain -> drawCircle(green.copy(alpha = 0.22f), radius = 22f, center = Offset(cx, cy))
-            else -> drawCircle(green.copy(alpha = 0.45f), radius = 5f, center = Offset(cx, cy))
+        if (!isFirst) drawLine(Hls.Line, Offset(cx, 0f), Offset(cx, cy), 4f)
+        if (!isLast) drawLine(Hls.Line, Offset(cx, cy), Offset(cx, size.height), 4f)
+        if (hasTrain) {
+            // 열차가 있는 역: 파란 링 + 흰 심
+            drawCircle(Hls.Accent, radius = 16f, center = Offset(cx, cy))
+            drawCircle(Hls.Paper, radius = 6f, center = Offset(cx, cy))
+        } else {
+            drawCircle(Hls.Paper, radius = 8f, center = Offset(cx, cy))
+            drawCircle(Hls.Line, radius = 8f, center = Offset(cx, cy), style = Stroke(width = 3f))
         }
     }
 }

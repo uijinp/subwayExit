@@ -5,19 +5,21 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 /**
- * "다왔다" 앱 테마. 브라우즈 화면은 라이트 고정(디자인 기준). 추적 화면은 자체 다크 surface 사용.
+ * "다왔다" 앱 테마 — HONEYLOVESOFT 디자인 시스템. 밝은 화면 고정, 추적 화면 상단만 [Hls.Ink] 띠.
  */
 private val LightColors = lightColorScheme(
-    primary = DawatColors.Green,
-    onPrimary = DawatColors.OnGreen,
-    secondary = DawatColors.GreenDeep,
-    background = DawatColors.LightBg,
-    onBackground = DawatColors.TextPrimary,
-    surface = DawatColors.Card,
-    onSurface = DawatColors.TextPrimary,
-    surfaceVariant = DawatColors.GreenTint,
-    error = DawatColors.Coral,
-    outline = DawatColors.TextMuted,
+    primary = Hls.Accent,
+    onPrimary = Hls.OnAccent,
+    secondary = Hls.AccentDeep,
+    background = Hls.Paper,
+    onBackground = Hls.Ink,
+    surface = Hls.Card,
+    onSurface = Hls.Ink,
+    surfaceVariant = Hls.CardAlt,
+    onSurfaceVariant = Hls.InkSoft,
+    error = Hls.ErrorText,
+    outline = Hls.Line,
+    outlineVariant = Hls.LineSoft,
 )
 
 @Composable
